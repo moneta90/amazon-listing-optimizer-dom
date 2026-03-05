@@ -5,13 +5,14 @@ import { useState, useEffect, useRef, useMemo } from "react";
    ═══════════════════════════════════════════ */
 
 const MARKETPLACES = [
-  { code: "DE", flag: "🇩🇪", lang: "Niemiecki", langEn: "German", color: "#FFD700" },
-  { code: "FR", flag: "🇫🇷", lang: "Francuski", langEn: "French", color: "#0055A4" },
-  { code: "IT", flag: "🇮🇹", lang: "Włoski", langEn: "Italian", color: "#008C45" },
-  { code: "ES", flag: "🇪🇸", lang: "Hiszpański", langEn: "Spanish", color: "#C60B1E" },
-  { code: "NL", flag: "🇳🇱", lang: "Holenderski", langEn: "Dutch", color: "#FF6600" },
-  { code: "SE", flag: "🇸🇪", lang: "Szwedzki", langEn: "Swedish", color: "#006AA7" },
-  { code: "PL", flag: "🇵🇱", lang: "Polski", langEn: "Polish", color: "#DC143C" },
+  { code: "DE", flags: ["🇩🇪"], name: "Niemcy", langEn: "German", color: "#FFD700" },
+  { code: "FR/BE", flags: ["🇫🇷", "🇧🇪"], name: "Francja / Belgia", langEn: "French", color: "#0055A4" },
+  { code: "IT", flags: ["🇮🇹"], name: "Włochy", langEn: "Italian", color: "#008C45" },
+  { code: "ES", flags: ["🇪🇸"], name: "Hiszpania", langEn: "Spanish", color: "#C60B1E" },
+  { code: "NL", flags: ["🇳🇱"], name: "Holandia", langEn: "Dutch", color: "#FF6600" },
+  { code: "SE", flags: ["🇸🇪"], name: "Szwecja", langEn: "Swedish", color: "#006AA7" },
+  { code: "PL", flags: ["🇵🇱"], name: "Polska", langEn: "Polish", color: "#DC143C" },
+  { code: "EN", flags: ["🇬🇧", "🇮🇪"], name: "UK / Irlandia", langEn: "English", color: "#C8102E" },
 ];
 
 const GROQ_MODELS = [
@@ -140,9 +141,9 @@ function MarketplaceSelector({ selected, setSelected }) {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       {MARKETPLACES.map(mp => {
-        const on = selected.includes(mp.code);
+        const on = selected === mp.code;
         return (
-          <button key={mp.code} onClick={() => setSelected(on ? selected.filter(c => c !== mp.code) : [...selected, mp.code])}
+          <button key={mp.code} onClick={() => setSelected(mp.code)}
             style={{
               padding: "8px 14px", borderRadius: 8,
               border: on ? `2px solid ${mp.color}` : `1px solid ${S.border}`,
@@ -150,7 +151,8 @@ function MarketplaceSelector({ selected, setSelected }) {
               cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400,
               display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", fontFamily: S.font,
             }}>
-            <span style={{ fontSize: 18 }}>{mp.flag}</span>{mp.code}
+            <span style={{ fontSize: 18, letterSpacing: 2 }}>{mp.flags.join("")}</span>
+            <span>{mp.name}</span>
           </button>
         );
       })}
@@ -407,62 +409,177 @@ function SettingsPanel({ apiKey, setApiKey, model, setModel }) {
    AI GENERATE PANEL
    ═══════════════════════════════════════════ */
 
-function AIGeneratePanel({ listing, setListing, marketplaces, apiKey, model, btg, selectedCategory }) {
+function AIGeneratePanel({ listing, setListing, marketplace, apiKey, model, btg, selectedCategory }) {
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
   const [productInfo, setProductInfo] = useState("");
-  const [keywords, setKeywords] = useState("");
+  const [mainKeyword, setMainKeyword] = useState("");
+  const [secondaryKeywords, setSecondaryKeywords] = useState("");
   const [error, setError] = useState("");
+
+  async function callGroq(messages) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 3000,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.error?.message || `Błąd HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || "";
+    return JSON.parse(text.replace(/```json|```/g, "").trim());
+  }
+
+  function buildPrompt(mp, catInfo) {
+    return `You are a world-class Amazon listing optimizer specializing in European marketplaces. You have deep expertise in Amazon's A9/A10 algorithm, Rufus, and Cosmo AI systems.
+
+TARGET MARKETPLACE: ${mp.code} (${mp.langEn})
+CRITICAL: Write NATIVELY in ${mp.langEn}. Do NOT translate from English or any other language. Use natural, fluent phrasing that a native ${mp.langEn} speaker would use when shopping online.
+
+PRODUCT INFORMATION:
+${productInfo}
+${mainKeyword ? `PRIMARY KEYWORD (MUST appear in the first 70 characters of the title, ideally as the first descriptive words after the brand): ${mainKeyword}` : "No primary keyword provided — determine the best primary keyword yourself based on the product."}
+${secondaryKeywords ? `SECONDARY KEYWORDS (weave these into the title after char 70, into bullet points, and description naturally): ${secondaryKeywords}` : "No secondary keywords provided — determine the best secondary keywords yourself."}
+${catInfo ? `CATEGORY: ${catInfo.path}\nitem_type_keyword: ${catInfo.item_type}\nCategory attributes: ${catInfo.attrs.join(", ")}` : ""}
+
+YOUR TASK: Generate a FULLY optimized Amazon listing. Even if the product description is brief, use your knowledge to infer logical product features and create a comprehensive listing. Think like an experienced Amazon seller.
+
+═══════════════════════════════════════
+TITLE RULES (CRITICAL — follow exactly)
+═══════════════════════════════════════
+- HARD LIMIT: Max 200 characters. AIM FOR 160-200 characters. A short title wastes keyword opportunities.
+- The first 66-70 characters are the MOST VALUABLE — this is what shows on mobile (~70% of Amazon traffic). The customer MUST understand what the product is within these first characters.
+- STRUCTURE: [Brand] [Primary Keyword = What It Is] – [Key Material/Feature] [Size] – [Secondary Feature/Keyword] – [Tertiary Keyword/Use Case] – [Model/Pack]
+- SINGLE IDENTITY FIRST: The first 66 chars must clearly state ONE product function. Never open with multiple functions (e.g. "heater and sterilizer") — this confuses the A9 algorithm about what the product IS.
+- NO unknown model names at the start. Customers don't search for proprietary model names. Push them to the END.
+- Include 2-3 keyword phrases naturally in the title. Use dashes (–) to separate logical sections.
+- PROHIBITED: No ! $ ? _ { } ^ ¬ ¦ characters. No ALL CAPS. No promotional phrases ("best seller", "free shipping"). No word repeated more than 2 times. No emojis.
+- Use numerals ("2" not "two"). Capitalize first letter of each word except prepositions/conjunctions/articles.
+
+═══════════════════════════════════════
+BULLET POINTS RULES (5 bullets)
+═══════════════════════════════════════
+- Total combined length: 700-1000 characters. Each bullet: 120-200 characters. Don't write tiny bullets.
+- FORMAT: [Benefit Headline] – Expanded explanation with feature details and a secondary keyword woven in naturally.
+- CAPITALIZATION RULE: ONLY the short headline part (before the dash) starts with a capital letter. The rest of the bullet is a normal sentence — do NOT capitalize every word. This is NOT a title, it's a sentence. Example correct format: "Schont die Waage – Die hochwertige Acryl-Unterlage schützt die empfindliche Waage Ihres Thermomix TM7 vor Kratzern und Beschädigungen."
+- Example WRONG format (do NOT do this): "Schont Die Waage – Die Hochwertige Acryl-Unterlage Schützt Die Empfindliche Waage" — this is Title Case applied to the whole bullet, which is WRONG.
+- Bullet #1 MUST reinforce the title's primary function. If the title says "Gleitbrett", bullet #1 must be about the sliding/gliding function.
+- Each bullet focuses on ONE benefit/feature area. Suggested themes:
+  1. Primary function / main benefit
+  2. Quality / materials / durability
+  3. Ease of use / convenience
+  4. Compatibility / versatility
+  5. Safety / certifications / warranty / what's included
+- Include SPECIFIC details: measurements, materials, certifications, compatible products, weight, dimensions.
+- Speak to the customer's needs: what problem does this solve? What do they gain?
+- Weave in secondary keywords naturally — never keyword-stuff.
+- NO ALL CAPS anywhere. No emojis.
+
+═══════════════════════════════════════
+PRODUCT DESCRIPTION RULES
+═══════════════════════════════════════
+- 1-2 paragraphs, aim for 800-1500 characters.
+- Expand on the most important features and use cases.
+- Paint a picture of the product in use — help the customer imagine owning it.
+- Include long-tail keywords naturally.
+- End with a confidence builder (warranty mention, brand quality, satisfaction).
+- No HTML, no special formatting.
+
+═══════════════════════════════════════
+BACKEND KEYWORDS RULES (CRITICAL)
+═══════════════════════════════════════
+- HARD LIMIT: Max 250 bytes. Special chars (ö, ü, ä, ß, é, ñ, ą, ę, etc.) = 2 bytes each.
+- TARGET: 240-250 bytes. Every unused byte is a MISSED indexing opportunity. Fill it up!
+- All lowercase, separated by spaces only. No commas, no punctuation.
+- MUST NOT repeat ANY word already in the title or bullet points. These are COMPLEMENTARY terms.
+- MUST NOT include: brand names, ASINs, promotional words, subjective words ("best", "amazing"), stop words ("and", "for", "the", "mit", "für", "und", etc.)
+- Use singular OR plural, not both.
+- WHAT TO INCLUDE: synonyms, alternate product names, related product types, abbreviations, compatible device names, related use cases, materials in different words, misspelling-adjacent terms.
+- Think broadly: what ELSE might a customer search for when looking for this product? Include those terms.
+
+═══════════════════════════════════════
+LANGUAGE-SPECIFIC NOTES
+═══════════════════════════════════════
+- DE: German compound nouns are valuable keywords (e.g., "Küchenmesser", "Schneidebrett"). Use them. Formal tone.
+- FR (FR/BE): Natural French with proper accents. Accented chars cost 2 bytes in backend. This listing serves both France and Belgium (French-speaking).
+- IT: Italian descriptions can be more expressive. Use appropriate articles.
+- ES: Use neutral Spanish for Spain (not Latin American).
+- NL: Keep straightforward, practical Dutch.
+- SE: Concise Swedish, compound words common.
+- PL: Nominative case in titles, natural cases in bullets.
+- EN (UK/IE): British English spelling (colour, aluminium, organisation). Practical, benefit-focused tone. This listing serves both UK and Ireland.
+
+═══════════════════════════════════════
+RESPONSE FORMAT
+═══════════════════════════════════════
+Respond ONLY with valid JSON. No backticks, no preamble, no explanation:
+{"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}
+
+FINAL CHECK before responding:
+- Is the title 160-200 characters? If under 140, ADD more keywords/features.
+- Does the first 70 chars clearly identify the product?
+- Are ALL 5 bullets substantive (120-200 chars each)? If any is under 100, EXPAND it.
+- Are backend keywords 240-250 bytes? If under 200, ADD more synonyms and related terms.
+- Does bullet #1 match the title's primary product identity?
+- Are backend keywords truly COMPLEMENTARY (no words from title/bullets)?`;
+  }
 
   async function generate() {
     if (!productInfo.trim()) return setError("Najpierw opisz swój produkt.");
     if (!apiKey.trim()) return setError("Wpisz klucz API Groq w ustawieniach powyżej.");
-    if (marketplaces.length === 0) return setError("Wybierz przynajmniej jeden marketplace.");
+    if (!marketplace) return setError("Wybierz marketplace.");
     setError("");
     setLoading(true);
+    setStatus("Generowanie listingu...");
 
     try {
-      const mp = MARKETPLACES.find(m => m.code === marketplaces[0]);
+      const mp = MARKETPLACES.find(m => m.code === marketplace);
       const catInfo = selectedCategory && btg?.category_attrs[selectedCategory];
-      const catPrompt = catInfo
-        ? `\nProduct category: ${catInfo.path}\nitem_type_keyword: ${catInfo.item_type}\nRequired/recommended attributes for this category: ${catInfo.attrs.join(", ")}\nInclude relevant attribute values in your listing where natural.`
-        : "";
+      const prompt = buildPrompt(mp, catInfo);
 
-      const prompt = `You are an expert Amazon listing optimizer for European marketplaces. Generate a fully optimized Amazon listing for the ${mp.code} (${mp.langEn}) marketplace.
+      let parsed = await callGroq([{ role: "user", content: prompt }]);
 
-Product info: ${productInfo}
-${keywords ? `Keywords to target: ${keywords}` : "Use your best judgment for keywords based on the product."}${catPrompt}
+      // Auto-validation: check if listing needs improvement
+      const titleLen = (parsed.title || "").length;
+      const bulletsTotal = [parsed.bullet1, parsed.bullet2, parsed.bullet3, parsed.bullet4, parsed.bullet5]
+        .map(b => (b || "").length).reduce((a, b) => a + b, 0);
+      const backendBytes = byteCount(parsed.backendKeywords || "");
 
-RULES:
-- Title: max 200 chars, primary keyword in first 70 chars, no ALL CAPS, no prohibited chars (! $ ? _ { } ^ ¬ ¦), no promotional phrases, no word repeated more than twice. Structure: [Brand] [Primary Keyword] – [Key Feature] [Size] – [Secondary Feature] – [Model/Pack]
-- 5 bullet points: total under 1000 chars combined, benefit-first format with Title Case headline then explanation, no ALL CAPS, bullet 1 must match title's primary function
-- Description: 1-2 paragraphs, max 2000 chars, no HTML
-- Backend keywords: max 250 bytes, all lowercase, space-separated, no words from title or bullets, no brand names, no stop words, no subjective words. Fill as close to 250 bytes as possible.
+      const issues = [];
+      if (titleLen < 130) issues.push(`Title is only ${titleLen} chars — expand to 160-200 chars by adding more keywords and features.`);
+      if (bulletsTotal < 500) issues.push(`Bullets total only ${bulletsTotal} chars — expand each bullet to 140-200 chars with more details and keywords.`);
+      if (backendBytes < 200) issues.push(`Backend keywords only ${backendBytes}/250 bytes — add more synonyms, related terms, alternate product names, compatible devices, use cases. Target 240-250 bytes. Remember: no words from title or bullets.`);
 
-Write NATIVELY in ${mp.langEn} — do NOT translate from English or Polish. Use natural fluent phrasing.
+      if (issues.length > 0) {
+        setStatus("Optymalizacja — rozbudowywanie listingu...");
+        const refinementPrompt = `The listing you generated has these issues:
+${issues.map((iss, i) => `${i + 1}. ${iss}`).join("\n")}
 
-Respond ONLY with valid JSON, no backticks, no preamble:
+Here is the current listing:
+${JSON.stringify(parsed, null, 2)}
+
+Fix ALL issues above. Keep everything in ${mp.langEn}. Make the listing BIGGER and BETTER.
+For the title: add secondary keywords, features, or use cases to reach 160-200 chars.
+For bullets: add specific details (dimensions, materials, compatibility, certifications) to reach 140-200 chars each.
+For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember no words already in title or bullets, no brand names, no stop words.
+
+Respond ONLY with the improved JSON, same format:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}`;
 
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model: model,
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `Błąd HTTP ${res.status}`);
+        parsed = await callGroq([
+          { role: "user", content: prompt },
+          { role: "assistant", content: JSON.stringify(parsed) },
+          { role: "user", content: refinementPrompt },
+        ]);
       }
-
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content || "";
-      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
 
       setListing({
         title: parsed.title || "",
@@ -470,8 +587,10 @@ Respond ONLY with valid JSON, no backticks, no preamble:
         description: parsed.description || "",
         backendKeywords: parsed.backendKeywords || "",
       });
+      setStatus("");
     } catch (e) {
       setError("Generowanie nie powiodło się: " + e.message);
+      setStatus("");
     } finally {
       setLoading(false);
     }
@@ -493,9 +612,12 @@ Respond ONLY with valid JSON, no backticks, no preamble:
 
       <Field label="Opis produktu" value={productInfo} onChange={setProductInfo} multi
         placeholder="np. Bambusowa deska do krojenia premium, 40x30 cm, z rowkiem na sok i antypoślizgowymi nóżkami, marka: CookNature..." />
-      <Field label="Docelowe słowa kluczowe (opcjonalnie)" value={keywords} onChange={setKeywords}
-        placeholder="np. deska do krojenia bambusowa, deska kuchenna, deska drewniana..."
-        helper="Oddzielone przecinkami. Jeśli puste, AI dobierze słowa na podstawie opisu." />
+      <Field label="Główne słowo kluczowe (Main Keyword)" value={mainKeyword} onChange={setMainKeyword}
+        placeholder="np. Gleitbrett, Wasserfilterkartusche, Schneidebrett..."
+        helper="To słowo pojawi się na początku tytułu (w pierwszych 70 znakach). Jedno słowo/fraza opisująca czym jest produkt." />
+      <Field label="Dodatkowe słowa kluczowe (Secondary Keywords)" value={secondaryKeywords} onChange={setSecondaryKeywords}
+        placeholder="np. Thermomix Zubehör, Rutschfest, Acryl Unterlage..."
+        helper="Oddzielone przecinkami. Zostaną wplecione w dalszą część tytułu, bullety i opis." />
 
       {error && (
         <div style={{ padding: "10px 14px", background: "#2d1215", border: "1px solid #7f1d1d", borderRadius: 8, color: "#fca5a5", fontSize: 13, marginBottom: 12 }}>
@@ -513,7 +635,7 @@ Respond ONLY with valid JSON, no backticks, no preamble:
         {loading ? (
           <><span style={{ display: "inline-block", width: 16, height: 16, border: `2px solid ${S.muted}`,
             borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            Generowanie zoptymalizowanego listingu...</>
+            {status || "Generowanie..."}</>
         ) : (<>⚡ Wygeneruj listing</>)}
       </button>
     </Card>
@@ -557,7 +679,7 @@ function ManualEditor({ listing, setListing }) {
 
 export default function App() {
   const [tab, setTab] = useState("generate");
-  const [marketplaces, setMarketplaces] = useState(["DE"]);
+  const [marketplace, setMarketplace] = useState("DE");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("llama-3.3-70b-versatile");
   const [btg, setBtg] = useState(null);
@@ -612,8 +734,8 @@ export default function App() {
       <div style={{ padding: "20px 28px", maxWidth: 960, margin: "0 auto" }}>
         {/* MARKETPLACE */}
         <Card style={{ marginBottom: 20 }}>
-          <SectionLabel>Docelowe marketplace'y</SectionLabel>
-          <MarketplaceSelector selected={marketplaces} setSelected={setMarketplaces} />
+          <SectionLabel>Docelowy marketplace</SectionLabel>
+          <MarketplaceSelector selected={marketplace} setSelected={setMarketplace} />
         </Card>
 
         {/* CATEGORY BROWSER */}
@@ -632,7 +754,7 @@ export default function App() {
           {tab === "generate" && (
             <>
               {!apiKey && <SettingsPanel apiKey={apiKey} setApiKey={setApiKey} model={model} setModel={setModel} />}
-              <AIGeneratePanel listing={listing} setListing={setListing} marketplaces={marketplaces}
+              <AIGeneratePanel listing={listing} setListing={setListing} marketplace={marketplace}
                 apiKey={apiKey} model={model} btg={btg} selectedCategory={selectedCategory} />
               {listing.title && <ListingPreview listing={listing} />}
             </>
