@@ -325,7 +325,7 @@ function ListingPreview({ listing }) {
       {listing.description && (
         <div style={{ marginBottom: 20 }}>
           <SectionLabel>Opis produktu</SectionLabel>
-          <div style={{ fontSize: 13, color: "#c4c8d0", lineHeight: 1.6, fontFamily: S.font }}>{listing.description}</div>
+          <div style={{ fontSize: 13, color: "#c4c8d0", lineHeight: 1.6, fontFamily: S.font }} dangerouslySetInnerHTML={{ __html: (listing.description || "").replace(/</g, "&lt;").replace(/&lt;br\s*\/?>/gi, "<br>") }} />
         </div>
       )}
 
@@ -491,19 +491,21 @@ PRODUCT DESCRIPTION RULES
 - Paint a picture of the product in use — help the customer imagine owning it.
 - Include long-tail keywords naturally.
 - End with a confidence builder (warranty mention, brand quality, satisfaction).
-- No HTML, no special formatting.
+- Use <br> tags to separate paragraphs for better readability. Example: "First paragraph text.<br><br>Second paragraph text."
+- No other HTML tags allowed — only <br> for line breaks.
 
 ═══════════════════════════════════════
 BACKEND KEYWORDS RULES (CRITICAL)
 ═══════════════════════════════════════
 - HARD LIMIT: Max 250 bytes. Special chars (ö, ü, ä, ß, é, ñ, ą, ę, etc.) = 2 bytes each.
-- TARGET: 240-250 bytes. Every unused byte is a MISSED indexing opportunity. Fill it up!
+- TARGET: 240-250 bytes. This is CRITICAL. You MUST reach at least 240 bytes. Every unused byte is a MISSED indexing opportunity.
 - All lowercase, separated by spaces only. No commas, no punctuation.
-- MUST NOT repeat ANY word already in the title or bullet points. These are COMPLEMENTARY terms.
-- MUST NOT include: brand names, ASINs, promotional words, subjective words ("best", "amazing"), stop words ("and", "for", "the", "mit", "für", "und", etc.)
-- Use singular OR plural, not both.
-- WHAT TO INCLUDE: synonyms, alternate product names, related product types, abbreviations, compatible device names, related use cases, materials in different words, misspelling-adjacent terms.
-- Think broadly: what ELSE might a customer search for when looking for this product? Include those terms.
+- ABSOLUTELY NO DUPLICATE WORDS. Every single word must appear EXACTLY ONCE. Before finalizing, scan your backend keywords and remove any word that appears more than once.
+- MUST NOT repeat ANY word already in the title, bullet points, or description. These are COMPLEMENTARY terms only.
+- MUST NOT include: brand names, ASINs, promotional words, subjective words ("best", "amazing"), stop words ("and", "for", "the", "mit", "für", "und", "do", "na", "i", "z", "w", etc.)
+- Use singular OR plural, not both (e.g., use "wąż" OR "węże", not both).
+- WHAT TO INCLUDE: Think of 30-40 unique words covering: synonyms, alternate product names, related product categories, compatible accessories, related use cases, materials, tools, places where product is used, actions the product enables, related seasonal terms.
+- Example thought process: For a garden hose reel → think about: irrigation, watering, lawn, patio, sprinkler, nozzle, connector, storage, outdoor, terrace, balcony, greenhouse, gardening tools, landscape, yard...
 
 ═══════════════════════════════════════
 LANGUAGE-SPECIFIC NOTES
@@ -514,7 +516,7 @@ LANGUAGE-SPECIFIC NOTES
 - ES: Use neutral Spanish for Spain (not Latin American).
 - NL: Keep straightforward, practical Dutch.
 - SE: Concise Swedish, compound words common.
-- PL: Nominative case in titles, natural cases in bullets.
+- PL: Nominative case in titles, natural cases in bullets. CRITICAL: Pay extra attention to Polish grammar — correct noun-adjective agreement (gender, case). Example: "Optymalne Urządzenie" (neuter) NOT "Optymalny Urządzenie". Double-check every adjective matches the gender of its noun.
 - EN (UK/IE): British English spelling (colour, aluminium, organisation). Practical, benefit-focused tone. This listing serves both UK and Ireland.
 
 ═══════════════════════════════════════
@@ -527,9 +529,11 @@ FINAL CHECK before responding:
 - Is the title 160-200 characters? If under 140, ADD more keywords/features.
 - Does the first 70 chars clearly identify the product?
 - Are ALL 5 bullets substantive (120-200 chars each)? If any is under 100, EXPAND it.
-- Are backend keywords 240-250 bytes? If under 200, ADD more synonyms and related terms.
+- Are backend keywords 240-250 bytes? If under 235, you MUST add more words. Think harder about synonyms, related categories, use cases.
 - Does bullet #1 match the title's primary product identity?
-- Are backend keywords truly COMPLEMENTARY (no words from title/bullets)?`;
+- Are backend keywords truly COMPLEMENTARY (no words from title/bullets)?
+- Do backend keywords contain ANY duplicate words? If yes, REMOVE duplicates and replace with new unique words.
+- For Polish: is every adjective-noun pair grammatically correct in gender and case?`;
   }
 
   async function generate() {
@@ -556,7 +560,7 @@ FINAL CHECK before responding:
       const issues = [];
       if (titleLen < 130) issues.push(`Title is only ${titleLen} chars — expand to 160-200 chars by adding more keywords and features.`);
       if (bulletsTotal < 500) issues.push(`Bullets total only ${bulletsTotal} chars — expand each bullet to 140-200 chars with more details and keywords.`);
-      if (backendBytes < 200) issues.push(`Backend keywords only ${backendBytes}/250 bytes — add more synonyms, related terms, alternate product names, compatible devices, use cases. Target 240-250 bytes. Remember: no words from title or bullets.`);
+      if (backendBytes < 235) issues.push(`Backend keywords only ${backendBytes}/250 bytes — you MUST add more words to reach 240-250 bytes. Brainstorm: synonyms, related categories, compatible products, use cases, materials, locations, actions. NO duplicates, NO words from title/bullets.`);
 
       if (issues.length > 0) {
         setStatus("Optymalizacja — rozbudowywanie listingu...");
@@ -569,7 +573,7 @@ ${JSON.stringify(parsed, null, 2)}
 Fix ALL issues above. Keep everything in ${mp.langEn}. Make the listing BIGGER and BETTER.
 For the title: add secondary keywords, features, or use cases to reach 160-200 chars.
 For bullets: add specific details (dimensions, materials, compatibility, certifications) to reach 140-200 chars each.
-For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember no words already in title or bullets, no brand names, no stop words.
+For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember: no words already in title or bullets, no brand names, no stop words, NO DUPLICATE WORDS.
 
 Respond ONLY with the improved JSON, same format:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}`;
@@ -579,6 +583,13 @@ Respond ONLY with the improved JSON, same format:
           { role: "assistant", content: JSON.stringify(parsed) },
           { role: "user", content: refinementPrompt },
         ]);
+      }
+
+      // Post-processing: deduplicate backend keywords
+      if (parsed.backendKeywords) {
+        const words = parsed.backendKeywords.toLowerCase().split(/\s+/).filter(Boolean);
+        const unique = [...new Set(words)];
+        parsed.backendKeywords = unique.join(" ");
       }
 
       setListing({
