@@ -16,9 +16,11 @@ const MARKETPLACES = [
 ];
 
 const GROQ_MODELS = [
-  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", desc: "Najlepszy — wielojęzyczny" },
-  { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", desc: "Szybki" },
-  { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", desc: "Dobry z EU językami" },
+  { id: "meta-llama/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick", desc: "Najlepszy wielojęzyczny — 400B parametrów" },
+  { id: "meta-llama/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout", desc: "Szybki — 460 tok/s, 12 języków EU" },
+  { id: "qwen/qwen3-32b", name: "Qwen 3 32B", desc: "Dobry z EU językami, 100+ języków" },
+  { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", desc: "Sprawdzony — dobra jakość ogólna" },
+  { id: "openai/gpt-oss-120b", name: "GPT-OSS 120B", desc: "Nowy OpenAI open-source 120B" },
 ];
 
 const BULLET_THEMES = [
@@ -730,7 +732,7 @@ export default function App() {
   const [tab, setTab] = useState("generate");
   const [marketplace, setMarketplace] = useState("DE");
   const [apiKey, setApiKey] = useState("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");
-  const [model, setModel] = useState("llama-3.3-70b-versatile");
+  const [model, setModel] = useState("meta-llama/llama-4-maverick-17b-128e-instruct");
   const [btg, setBtg] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [listing, setListing] = useState({
