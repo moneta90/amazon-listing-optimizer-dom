@@ -678,13 +678,14 @@ BULLET POINTS RULES (5 bullets)
 - CAPITALIZATION RULE: ONLY the short headline part (before the dash) starts with a capital letter. The rest of the bullet is a normal sentence — do NOT capitalize every word. This is NOT a title, it's a sentence. Example correct format: "Schont die Waage – Die hochwertige Acryl-Unterlage schützt die empfindliche Waage Ihres Thermomix TM7 vor Kratzern und Beschädigungen."
 - Example WRONG format (do NOT do this): "Schont Die Waage – Die Hochwertige Acryl-Unterlage Schützt Die Empfindliche Waage" — this is Title Case applied to the whole bullet, which is WRONG.
 - Bullet #1 MUST reinforce the title's primary function. If the title says "Gleitbrett", bullet #1 must be about the sliding/gliding function.
-- Each bullet focuses on ONE benefit/feature area. Suggested themes:
-  1. Primary function / main benefit
-  2. Quality / materials / durability
-  3. Ease of use / convenience
-  4. Compatibility / versatility
-  5. Safety / certifications / warranty / what's included
-- Include SPECIFIC details: measurements, materials, certifications, compatible products, weight, dimensions.
+- CROSS-MARKETPLACE CONSISTENCY: The logical structure and meaning of the 5 bullets MUST be exactly the same regardless of what language you are writing in. Do not invent random benefits.
+- You MUST strictly follow these 5 themes in this EXACT order:
+  Bullet 1. Primary function / main benefit (What it does perfectly)
+  Bullet 2. Quality / materials / durability (What it's made of and why it lasts)
+  Bullet 3. Ease of use / convenience / installation (How simple it is to use)
+  Bullet 4. Compatibility / versatility / dimensions (Where it fits and exact sizes)
+  Bullet 5. Safety / certifications / warranty / what's included (Why it's a safe purchase)
+- Under each theme, include SPECIFIC details from the product info: measurements, materials, certifications, compatible products. Do not use generic fluff.
 - Speak to the customer's needs: what problem does this solve? What do they gain?
 - Weave in secondary keywords naturally — never keyword-stuff.
 - NO ALL CAPS anywhere. No emojis.
