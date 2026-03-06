@@ -309,8 +309,120 @@ function SectionHead({ children, copyText, copyLabel }) {
 }
 
 /* ═══════════════════════════════════════════
-   LISTING PREVIEW + SCORE
+   LISTING PREVIEW + SCORE + EXCEL INJECTOR
    ═══════════════════════════════════════════ */
+
+function ExcelInjector({ listing }) {
+  const [msg, setMsg] = useState("");
+  
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setMsg("Przetwarzanie...");
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          if (!window.XLSX) {
+            setMsg("❌ Biblioteka XLSX nie została załadowana. Odśwież stronę.");
+            return;
+          }
+          const data = new Uint8Array(evt.target.result);
+          const workbook = window.XLSX.read(data, { type: "array", cellStyles: true });
+          
+          // Znajdź arkusz 'Template' lub 'Modèle', w przeciwnym razie bierzemy pierwszy
+          let targetSheetName = workbook.SheetNames.find(n => n.toLowerCase().includes("template") || n.toLowerCase().includes("modèle") || n.toLowerCase().includes("plantilla") || n.toLowerCase().includes("modello") || n.toLowerCase().includes("vorlage"));
+          if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
+          
+          const sheet = workbook.Sheets[targetSheetName];
+          const json = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+          
+          // Szukamy wierszy systemowych (często wiersz 2 i 3 są nagłówkami systemowymi na Amazonie)
+          let headerRowIdx = -1;
+          for(let i=0; i<5; i++) {
+             if(json[i] && json[i].some(c => c && typeof c === 'string' && c.toLowerCase().includes('item_name'))) {
+               headerRowIdx = i; break;
+             }
+          }
+          
+          if(headerRowIdx === -1) {
+            setMsg("❌ Nie znaleziono standardowych nagłówków Amazon (brak kolumny 'item_name') w pierwszych wierszach.");
+            return;
+          }
+          
+          const headers = json[headerRowIdx];
+          const dataRowIdx = headerRowIdx + 1; // Pierwszy wiersz z danymi to przeważnie wiersz od razu pod technicznymi nagłówkami
+          
+          if(!json[dataRowIdx]) json[dataRowIdx] = [];
+          const dataRow = json[dataRowIdx];
+          
+          // Mapowanie kolumn
+          const columnsToFill = {
+            "item_name": listing.title,
+            "product_description": listing.description || "",
+            "bullet_point1": listing.bullets[0] || "",
+            "bullet_point2": listing.bullets[1] || "",
+            "bullet_point3": listing.bullets[2] || "",
+            "bullet_point4": listing.bullets[3] || "",
+            "bullet_point5": listing.bullets[4] || "",
+            "generic_keywords": listing.backendKeywords || ""
+          };
+          
+          let updatedCount = 0;
+          headers.forEach((h, colIdx) => {
+             const lowerH = h ? h.toString().toLowerCase().trim() : "";
+             if (columnsToFill[lowerH] !== undefined && columnsToFill[lowerH] !== "") {
+               dataRow[colIdx] = columnsToFill[lowerH];
+               updatedCount++;
+             }
+          });
+          
+          json[dataRowIdx] = dataRow;
+          
+          // Podmiana danych w arkuszu
+          const newSheet = window.XLSX.utils.aoa_to_sheet(json);
+          workbook.Sheets[targetSheetName] = newSheet;
+          
+          const ext = file.name.substring(file.name.lastIndexOf('.'));
+          const newName = file.name.replace(ext, "_z_AI" + ext);
+          window.XLSX.writeFile(workbook, newName);
+          setMsg(`✅ Zaktualizowano ${updatedCount} kolumn (zapisano jako ${newName}).`);
+        } catch (err) {
+          console.error(err);
+          setMsg("❌ Błąd przetwarzania pliku: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      setMsg("❌ Błąd wejścia/wyjścia: " + err.message);
+    }
+    // Zresetuj input, by można było wgrać ten sam plik ponownie
+    e.target.value = null;
+  };
+
+  return (
+    <div style={{ marginTop: 24, padding: 16, border: "1px dashed #22c55e", borderRadius: 8, background: "#22c55e10" }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#22c55e", marginBottom: 8, display: "flex", gap: 8 }}>
+        <span style={{ fontSize: 16 }}>📥</span> Wstrzyknij listing do szablonu Amazon (Flat File)
+      </div>
+      <div style={{ fontSize: 12, color: "#c4c8d0", marginBottom: 16, lineHeight: 1.5 }}>
+        Pobierz pusty plik "Inventory File" (Excel / xlsm / xlsx) ze strony dodawania produktu na Amazon (Seller Central). <br/>
+        Wgraj go tutaj — aplikacja odnajdzie ukryte w nim wbudowane techniczne kolumny (np. <span style={{ fontFamily: "monospace", color: "#60a5fa"}}>item_name</span>) i wstawi w odpowiednie komórki wygenerowany właśnie przez AI listing (zajmując <strong style={{color:"#fff"}}>wiersz nr 4</strong> zapisu). Otrzymasz natychmiast gotowy do podmiany nowy plik.
+      </div>
+      
+      <label style={{
+        display: "inline-flex", padding: "10px 18px", background: "#22c55e", color: "#111", 
+        borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer", transition: "transform 0.1s"
+      }} onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
+        + Wybierz plik Amazon na komputerze
+        <input type="file" accept=".xlsx,.xls,.xlsm" onChange={handleFile} style={{ display: "none" }} />
+      </label>
+      
+      {msg && <div style={{ marginTop: 12, fontSize: 13, color: msg.includes("❌") ? "#ef4444" : "#4ade80", fontWeight: 600 }}>{msg}</div>}
+    </div>
+  );
+}
 
 function ListingPreview({ listing }) {
   if (!listing) return null;
@@ -378,6 +490,9 @@ function ListingPreview({ listing }) {
           <div style={{ marginTop: 4 }}><CharBadge current={bBytes} max={250} label="bajty" /></div>
         </div>
       )}
+
+      {/* Komponent do wgrywania plików Excela */}
+      <ExcelInjector listing={listing} />
     </Card>
   );
 }
