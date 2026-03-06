@@ -739,7 +739,15 @@ FINAL CHECK before responding:
 - Does bullet #1 match the title's primary product identity?
 - Are backend keywords truly COMPLEMENTARY (no words from title/bullets)?
 - Do backend keywords contain ANY duplicate words? If yes, REMOVE duplicates and replace with new unique words.
-- For Polish: is every adjective-noun pair grammatically correct in gender and case?`;
+- For Polish: is every adjective-noun pair grammatically correct in gender and case?
+
+═══════════════════════════════════════
+LANGUAGE REMINDER (MOST IMPORTANT)
+═══════════════════════════════════════
+You MUST write the ENTIRE listing (title, all 5 bullets, description, backend keywords) in ${mp.langEn}.
+The source material above may be in Polish, German, English, or any other language — that does NOT matter.
+Your output language is ONLY ${mp.langEn}. If even a single sentence is not in ${mp.langEn}, you have FAILED.
+Double-check: Is every word in your JSON response written in ${mp.langEn}? If not, rewrite it now.`;
   }
 
   async function generate() {
@@ -770,7 +778,9 @@ FINAL CHECK before responding:
         userContent = prompt;
       }
 
-      let parsed = await callAI([{ role: "user", content: userContent }]);
+      const systemMessage = { role: "system", content: `You are an Amazon listing generator. You MUST write ALL output EXCLUSIVELY in ${mp.langEn}. The user may provide product information in any language (Polish, German, English, etc.) — treat it ONLY as source data. Your ENTIRE response (title, bullets, description, backend keywords) MUST be in ${mp.langEn}. Never output text in any other language. Respond with valid JSON only.` };
+
+      let parsed = await callAI([systemMessage, { role: "user", content: userContent }]);
 
       // Auto-validation: check if listing needs improvement
       const titleLen = (parsed.title || "").length;
@@ -801,10 +811,49 @@ Respond ONLY with the improved JSON, same format:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}`;
 
         parsed = await callAI([
+          systemMessage,
           { role: "user", content: prompt },
           { role: "assistant", content: JSON.stringify(parsed) },
           { role: "user", content: refinementPrompt },
         ]);
+      }
+
+      // Post-processing: language validation
+      // Check if the listing might be in the wrong language by detecting Polish-specific patterns when target is not Polish
+      if (mp.code !== "PL") {
+        const listingTextCheck = [
+          parsed.title || "",
+          parsed.bullet1 || "", parsed.bullet2 || "", parsed.bullet3 || "",
+          parsed.bullet4 || "", parsed.bullet5 || "",
+          parsed.description || "",
+        ].join(" ").toLowerCase();
+        
+        // Common Polish words that wouldn't appear in other languages
+        const polishMarkers = ["jest", "oraz", "które", "który", "która", "dzięki", "czemu", "również", "można", "bardzo", "przez", "jego", "jej", "tego", "zapewnia", "umożliwia", "posiada", "wykonany", "wykonana", "produktu", "użycia"];
+        const polishHits = polishMarkers.filter(w => {
+          const regex = new RegExp(`\\b${w}\\b`, 'gi');
+          return regex.test(listingTextCheck);
+        });
+        
+        if (polishHits.length >= 3) {
+          setStatus(`Wykryto polski tekst zamiast ${mp.langEn} — ponowne generowanie...`);
+          const langFixPrompt = `CRITICAL ERROR: Your previous response was written in Polish, but the target language is ${mp.langEn}.
+
+Here is the WRONG listing (in Polish):
+${JSON.stringify(parsed, null, 2)}
+
+You MUST rewrite this ENTIRE listing in ${mp.langEn}. Every single word must be in ${mp.langEn}.
+Do NOT translate word-by-word from Polish. Write it NATIVELY in ${mp.langEn} as a native speaker would.
+Keep the same product information, features, and structure, but the language MUST be ${mp.langEn}.
+
+Respond ONLY with valid JSON in ${mp.langEn}:
+{"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}`;
+          
+          parsed = await callAI([
+            systemMessage,
+            { role: "user", content: langFixPrompt },
+          ]);
+        }
       }
 
       // Post-processing: clean backend keywords thoroughly
