@@ -856,6 +856,71 @@ Respond ONLY with valid JSON in ${mp.langEn}:
         }
       }
 
+      // Post-processing: enforce bullet points HARD LIMIT of 1000 chars
+      {
+        const bulletKeys = ["bullet1", "bullet2", "bullet3", "bullet4", "bullet5"];
+        let bullets = bulletKeys.map(k => parsed[k] || "");
+        let total = bullets.reduce((sum, b) => sum + b.length, 0);
+
+        if (total > 1000) {
+          // Calculate how much we need to trim
+          const excess = total - 1000;
+          // Target length per bullet (proportional trimming)
+          const targetTotal = 1000;
+
+          // Sort bullets by length (longest first) to trim longest ones more
+          const indexed = bullets.map((b, i) => ({ text: b, idx: i, len: b.length }));
+          indexed.sort((a, b) => b.len - a.len);
+
+          let remaining = targetTotal;
+          const maxPerBullet = [];
+          
+          // Distribute chars: give each bullet proportional share of 1000
+          for (let i = 0; i < indexed.length; i++) {
+            const share = Math.floor(remaining / (indexed.length - i));
+            const actual = Math.min(indexed[i].len, share);
+            maxPerBullet[indexed[i].idx] = actual;
+            remaining -= actual;
+          }
+
+          // Trim each bullet intelligently at sentence/phrase boundaries
+          bullets = bullets.map((b, i) => {
+            const max = maxPerBullet[i];
+            if (b.length <= max) return b;
+            
+            // Try to cut at the last sentence ending (. or –) before the limit
+            let trimmed = b.slice(0, max);
+            const lastPeriod = trimmed.lastIndexOf(".");
+            const lastDash = trimmed.lastIndexOf(" – ");
+            const lastComma = trimmed.lastIndexOf(", ");
+            
+            // Find the best cut point
+            const cutPoint = Math.max(
+              lastPeriod > max * 0.6 ? lastPeriod + 1 : -1,
+              lastComma > max * 0.7 ? lastComma : -1,
+            );
+            
+            if (cutPoint > max * 0.6) {
+              trimmed = b.slice(0, cutPoint).trimEnd();
+              // Add period if doesn't end with one
+              if (!trimmed.endsWith(".")) trimmed += ".";
+            } else {
+              // Just hard cut at word boundary
+              const lastSpace = trimmed.lastIndexOf(" ");
+              if (lastSpace > max * 0.5) {
+                trimmed = b.slice(0, lastSpace).trimEnd();
+              }
+              if (!trimmed.endsWith(".")) trimmed += ".";
+            }
+            
+            return trimmed;
+          });
+
+          // Apply trimmed bullets back
+          bulletKeys.forEach((k, i) => { parsed[k] = bullets[i]; });
+        }
+      }
+
       // Post-processing: clean backend keywords thoroughly
       if (parsed.backendKeywords) {
         // Collect all words from title, bullets, description (lowercased)
