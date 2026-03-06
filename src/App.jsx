@@ -331,23 +331,28 @@ function ExcelInjector({ listing }) {
           const data = new Uint8Array(evt.target.result);
           const workbook = window.XLSX.read(data, { type: "array", cellStyles: true });
           
-          // Znajdź arkusz 'Template' lub 'Modèle', w przeciwnym razie bierzemy pierwszy
-          let targetSheetName = workbook.SheetNames.find(n => n.toLowerCase().includes("template") || n.toLowerCase().includes("modèle") || n.toLowerCase().includes("plantilla") || n.toLowerCase().includes("modello") || n.toLowerCase().includes("vorlage"));
-          if (!targetSheetName) targetSheetName = workbook.SheetNames[0];
-          
-          const sheet = workbook.Sheets[targetSheetName];
-          const json = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-          
-          // Szukamy wierszy systemowych (często wiersz 2 i 3 są nagłówkami systemowymi na Amazonie)
+          // Przeszukujemy wszystkie arkusze w pliku i pierwsze 10 wierszy w poszukiwaniu ukrytych nagłówków systemowych
+          let targetSheetName = null;
           let headerRowIdx = -1;
-          for(let i=0; i<5; i++) {
-             if(json[i] && json[i].some(c => c && typeof c === 'string' && c.toLowerCase().includes('item_name'))) {
-               headerRowIdx = i; break;
-             }
+          let json = null;
+
+          for (const sName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sName];
+            const tempJson = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+            
+            for(let i=0; i<10; i++) {
+               if(tempJson[i] && tempJson[i].some(c => c && typeof c === 'string' && c.toLowerCase().trim() === 'item_name')) {
+                 targetSheetName = sName;
+                 headerRowIdx = i;
+                 json = tempJson;
+                 break;
+               }
+            }
+            if (targetSheetName) break;
           }
           
-          if(headerRowIdx === -1) {
-            setMsg("❌ Nie znaleziono standardowych nagłówków Amazon (brak kolumny 'item_name') w pierwszych wierszach.");
+          if(!targetSheetName || headerRowIdx === -1) {
+            setMsg("❌ Nie znaleziono standardowych nagłówków systemowych Amazon (brak kolumny 'item_name') w żadnym z arkuszy tego pliku.");
             return;
           }
           
