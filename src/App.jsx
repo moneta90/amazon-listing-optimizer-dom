@@ -671,7 +671,9 @@ TITLE RULES (CRITICAL — follow exactly)
 ═══════════════════════════════════════
 BULLET POINTS RULES (5 bullets)
 ═══════════════════════════════════════
-- Total combined length: 700-1000 characters. Each bullet: 120-200 characters. Don't write tiny bullets.
+- HARD LIMIT: Total combined length of ALL 5 bullets MUST be between 950-1000 characters. NEVER exceed 1000 characters total. Aim for exactly 950-1000.
+- Each bullet: 180-200 characters. All 5 bullets should be similar in length to reach the 950-1000 total without exceeding it.
+- If the total exceeds 1000, shorten the longest bullets. If under 950, expand the shortest ones.
 - FORMAT: [Benefit Headline] – Expanded explanation with feature details and a secondary keyword woven in naturally.
 - CAPITALIZATION RULE: ONLY the short headline part (before the dash) starts with a capital letter. The rest of the bullet is a normal sentence — do NOT capitalize every word. This is NOT a title, it's a sentence. Example correct format: "Schont die Waage – Die hochwertige Acryl-Unterlage schützt die empfindliche Waage Ihres Thermomix TM7 vor Kratzern und Beschädigungen."
 - Example WRONG format (do NOT do this): "Schont Die Waage – Die Hochwertige Acryl-Unterlage Schützt Die Empfindliche Waage" — this is Title Case applied to the whole bullet, which is WRONG.
@@ -732,7 +734,7 @@ Respond ONLY with valid JSON. No backticks, no preamble, no explanation:
 FINAL CHECK before responding:
 - Is the title 160-200 characters? If under 140, ADD more keywords/features.
 - Does the first 70 chars clearly identify the product?
-- Are ALL 5 bullets substantive (120-200 chars each)? If any is under 100, EXPAND it.
+- Is the TOTAL of all 5 bullets between 950-1000 characters? HARD LIMIT: 1000 chars max. If over 1000, SHORTEN bullets. If under 950, EXPAND them. Count carefully.
 - Are backend keywords 240-250 bytes? If under 235, you MUST add more words. Think harder about synonyms, related categories, use cases.
 - Does bullet #1 match the title's primary product identity?
 - Are backend keywords truly COMPLEMENTARY (no words from title/bullets)?
@@ -778,7 +780,8 @@ FINAL CHECK before responding:
 
       const issues = [];
       if (titleLen < 130) issues.push(`Title is only ${titleLen} chars — expand to 160-200 chars by adding more keywords and features.`);
-      if (bulletsTotal < 500) issues.push(`Bullets total only ${bulletsTotal} chars — expand each bullet to 140-200 chars with more details and keywords.`);
+      if (bulletsTotal > 1000) issues.push(`Bullets total is ${bulletsTotal} chars — this EXCEEDS the HARD LIMIT of 1000 characters. You MUST shorten the bullets to fit within 950-1000 characters total. Trim the longest bullets first while keeping key information.`);
+      else if (bulletsTotal < 900) issues.push(`Bullets total only ${bulletsTotal} chars — expand each bullet to 180-200 chars to reach 950-1000 total.`);
       if (backendBytes < 235) issues.push(`Backend keywords only ${backendBytes}/250 bytes — you MUST add more words to reach 240-250 bytes. Brainstorm: synonyms, related categories, compatible products, use cases, materials, locations, actions. NO duplicates, NO words from title/bullets.`);
 
       if (issues.length > 0) {
@@ -791,7 +794,7 @@ ${JSON.stringify(parsed, null, 2)}
 
 Fix ALL issues above. Keep everything in ${mp.langEn}. Make the listing BIGGER and BETTER.
 For the title: add secondary keywords, features, or use cases to reach 160-200 chars.
-For bullets: add specific details (dimensions, materials, compatibility, certifications) to reach 140-200 chars each.
+For bullets: the TOTAL of all 5 bullets MUST be between 950-1000 characters. HARD LIMIT: 1000 max. Each bullet should be 180-200 chars. If over 1000, shorten the longest bullets. If under 950, add details.
 For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember: no words already in title or bullets, no brand names, no stop words, NO DUPLICATE WORDS.
 
 Respond ONLY with the improved JSON, same format:
