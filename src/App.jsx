@@ -498,12 +498,12 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
     reader.readAsText(file);
   }
 
-  // Text file reader
-  function handleTextUpload(e) {
+  // Text/DOCX/image file reader
+  async function handleTextUpload(e) {
     const files = Array.from(e.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
+    for (const file of files) {
       if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
         reader.onload = (ev) => {
           const base64 = ev.target.result.split(",")[1];
           const mimeType = file.type;
@@ -511,14 +511,31 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
           setUploadedFiles(prev => [...prev, { name: file.name, type: "image" }]);
         };
         reader.readAsDataURL(file);
+      } else if (file.name.endsWith(".docx")) {
+        // Parse DOCX using mammoth
+        try {
+          const mammoth = await import("mammoth");
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          const text = result.value || "";
+          if (text.trim()) {
+            setUploadedFiles(prev => [...prev, { name: file.name, type: "text", content: text }]);
+          } else {
+            setError("Plik DOCX jest pusty lub nie udało się go odczytać.");
+          }
+        } catch (err) {
+          setError("Błąd odczytu pliku DOCX: " + err.message);
+        }
       } else {
+        // Plain text files (.txt, .csv etc)
+        const reader = new FileReader();
         reader.onload = (ev) => {
           const text = ev.target.result;
           setUploadedFiles(prev => [...prev, { name: file.name, type: "text", content: text }]);
         };
         reader.readAsText(file);
       }
-    });
+    }
   }
 
   function removeFile(idx) {
@@ -867,7 +884,7 @@ Respond ONLY with the improved JSON, same format:
           }}>
             <span style={{ fontSize: 16 }}>📎</span>
             Wgraj zdjęcia / pliki tekstowe
-            <input type="file" accept="image/*,.txt,.pdf,.doc,.docx" multiple onChange={handleTextUpload} style={{ display: "none" }} />
+            <input type="file" accept="image/*,.txt,.docx,.doc,.pdf" multiple onChange={handleTextUpload} style={{ display: "none" }} />
           </label>
         </div>
 
