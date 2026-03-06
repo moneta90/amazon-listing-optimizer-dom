@@ -330,8 +330,20 @@ function ExcelInjector({ listing }) {
           }
           const data = new Uint8Array(evt.target.result);
           const workbook = window.XLSX.read(data, { type: "array", cellStyles: true });
-          
-          // Przeszukujemy wszystkie arkusze w pliku i pierwsze 10 wierszy w poszukiwaniu ukrytych nagłówków systemowych
+
+          // Mapowanie aliasów kolumn dla wielu rynków i wersji językowych Amazon
+          const COLUMN_ALIASES = {
+            title: ['item_name', 'title', 'produktname', 'nom_du_produit', 'nom du produit', 'titre', 'nombre_del_producto', 'nome_dell_articolo', 'nazwa_produktu', 'product_name'],
+            desc: ['product_description', 'produktbeschreibung', 'description_du_produit', 'descripción_del_producto', 'descrizione_del_prodotto', 'opis_produktu'],
+            bp1: ['bullet_point1', 'bullet_point_1', 'bullet-punkt 1', 'caractéristique_1', 'característica_1', 'caratteristica_1', 'punkt_opisowy_1'],
+            bp2: ['bullet_point2', 'bullet_point_2', 'bullet-punkt 2', 'caractéristique_2', 'característica_2', 'caratteristica_2', 'punkt_opisowy_2'],
+            bp3: ['bullet_point3', 'bullet_point_3', 'bullet-punkt 3', 'caractéristique_3', 'característica_3', 'caratteristica_3', 'punkt_opisowy_3'],
+            bp4: ['bullet_point4', 'bullet_point_4', 'bullet-punkt 4', 'caractéristique_4', 'característica_4', 'caratteristica_4', 'punkt_opisowy_4'],
+            bp5: ['bullet_point5', 'bullet_point_5', 'bullet-punkt 5', 'caractéristique_5', 'característica_5', 'caratteristica_5', 'punkt_opisowy_5'],
+            keywords: ['generic_keywords', 'search_terms', 'generic_keyword', 'allgemeine_schlüsselwörter', 'mots_clés_génériques', 'términos_de_búsqueda_genéricos', 'termini_di_ricerca_generici']
+          };
+
+          // Przeszukujemy wszystkie arkusze w pliku i pierwsze 10 wierszy w poszukiwaniu jakiegokolwiek nagłówka tytułowego
           let targetSheetName = null;
           let headerRowIdx = -1;
           let json = null;
@@ -341,7 +353,7 @@ function ExcelInjector({ listing }) {
             const tempJson = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
             
             for(let i=0; i<10; i++) {
-               if(tempJson[i] && tempJson[i].some(c => c && typeof c === 'string' && c.toLowerCase().trim() === 'item_name')) {
+               if(tempJson[i] && tempJson[i].some(c => c && typeof c === 'string' && COLUMN_ALIASES.title.includes(c.toLowerCase().trim()))) {
                  targetSheetName = sName;
                  headerRowIdx = i;
                  json = tempJson;
@@ -352,34 +364,43 @@ function ExcelInjector({ listing }) {
           }
           
           if(!targetSheetName || headerRowIdx === -1) {
-            setMsg("❌ Nie znaleziono standardowych nagłówków systemowych Amazon (brak kolumny 'item_name') w żadnym z arkuszy tego pliku.");
+             // Zrzut ratunkowy nazw kolumn do błędu, aby user wiedział gdzie szukał
+            setMsg("❌ Nie odnaleziono nagłówka tytułu (np. item_name, Produktname) w pierwszych 10 wierszach żadnego arkusza.");
             return;
           }
           
           const headers = json[headerRowIdx];
-          const dataRowIdx = headerRowIdx + 1; // Pierwszy wiersz z danymi to przeważnie wiersz od razu pod technicznymi nagłówkami
+          const dataRowIdx = headerRowIdx + 1; // Pierwszy wiersz z danymi
           
           if(!json[dataRowIdx]) json[dataRowIdx] = [];
           const dataRow = json[dataRowIdx];
           
-          // Mapowanie kolumn
-          const columnsToFill = {
-            "item_name": listing.title,
-            "product_description": listing.description || "",
-            "bullet_point1": listing.bullets[0] || "",
-            "bullet_point2": listing.bullets[1] || "",
-            "bullet_point3": listing.bullets[2] || "",
-            "bullet_point4": listing.bullets[3] || "",
-            "bullet_point5": listing.bullets[4] || "",
-            "generic_keywords": listing.backendKeywords || ""
+          const getListingValue = (aliasKey) => {
+            if (aliasKey === 'title') return listing.title;
+            if (aliasKey === 'desc') return listing.description || "";
+            if (aliasKey === 'bp1') return listing.bullets[0] || "";
+            if (aliasKey === 'bp2') return listing.bullets[1] || "";
+            if (aliasKey === 'bp3') return listing.bullets[2] || "";
+            if (aliasKey === 'bp4') return listing.bullets[3] || "";
+            if (aliasKey === 'bp5') return listing.bullets[4] || "";
+            if (aliasKey === 'keywords') return listing.backendKeywords || "";
+            return undefined;
           };
           
           let updatedCount = 0;
           headers.forEach((h, colIdx) => {
              const lowerH = h ? h.toString().toLowerCase().trim() : "";
-             if (columnsToFill[lowerH] !== undefined && columnsToFill[lowerH] !== "") {
-               dataRow[colIdx] = columnsToFill[lowerH];
-               updatedCount++;
+             if (!lowerH) return;
+             
+             for (const [key, aliases] of Object.entries(COLUMN_ALIASES)) {
+                if (aliases.includes(lowerH)) {
+                  const val = getListingValue(key);
+                  if (val) {
+                    dataRow[colIdx] = val;
+                    updatedCount++;
+                  }
+                  break; // Znalazł klucz, szukaj kolejnej komórki nagłówka
+                }
              }
           });
           
