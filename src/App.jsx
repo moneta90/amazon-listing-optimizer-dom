@@ -283,7 +283,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory }) {
   const attrs = selCat ? selCat.attrs : [];
 
   return (
-    <Card style={{ marginBottom: 20 }}>
+    <Card style={{ marginBottom: 20, marginTop: 20, borderTop: `1px solid ${S.border}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <span style={{ fontSize: 20 }}>📂</span>
         <div>
@@ -2097,7 +2097,6 @@ export default function App() {
                 onSaveListing={saveToHistory} />
               {listing.title && <ListingPreview listing={listing} />}
               {csvKeywords && listing.title && <KeywordUsageTable keywords={csvKeywords} listing={listing} secondaryKeywords={secondaryKeywords} setSecondaryKeywords={setSecondaryKeywords} />}
-              <div style={{ marginTop: 8, marginBottom: 20, borderTop: `1px solid ${S.border}` }} />
               <CategoryBrowser btg={btg} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
             </>
           )}
