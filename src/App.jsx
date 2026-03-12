@@ -1246,6 +1246,60 @@ Your output language is ONLY ${mp.langEn}. If even a single sentence is not in $
 Double-check: Is every word in your JSON response written in ${mp.langEn}? If not, rewrite it now.`;
   }
 
+  async function detectCategoryFromListing(listing, btgData, mp) {
+    if (!btgData || !btgData.categories) return null;
+
+    try {
+      const categoryList = btgData.categories
+        .slice(0, 50) // Limit to first 50 for token efficiency
+        .map((cat, idx) => `${idx + 1}. [${cat.id}] ${cat.path} (item_type_keyword: ${cat.item_type})`)
+        .join("\n");
+
+      const listingText = [
+        listing.title || "",
+        ...(listing.bullets || []),
+        listing.description || "",
+        listing.backendKeywords || ""
+      ].join(" ");
+
+      const detectPrompt = `You are an expert Amazon category matcher. I will give you a product listing and a list of possible Amazon Browse Tree Guide (BTG) categories. Your job is to determine which category this product BEST matches.
+
+PRODUCT LISTING TO CLASSIFY:
+Title: ${listing.title}
+Bullets: ${(listing.bullets || []).join(" | ")}
+Description: ${listing.description}
+Backend Keywords: ${listing.backendKeywords}
+
+AVAILABLE CATEGORIES (first 50):
+${categoryList}
+
+Based on the product information above, which category from the list BEST matches this product? Consider:
+- Product type and main function
+- Key features and materials mentioned
+- Use cases and applications
+- Related keywords and terminology
+
+Respond ONLY with the category ID in this format: {"categoryId": "CATEGORY_ID_HERE"}`;
+
+      const response = await callAI([
+        { role: "system", content: `You are a category matching expert. Respond with ONLY valid JSON. No explanations, no markdown, just pure JSON.` },
+        { role: "user", content: detectPrompt }
+      ]);
+
+      if (response && response.categoryId && typeof response.categoryId === "string") {
+        // Verify the category exists in btgData
+        const categoryExists = btgData.categories.some(cat => cat.id === response.categoryId);
+        if (categoryExists) {
+          return response.categoryId;
+        }
+      }
+      return null;
+    } catch (e) {
+      console.warn("Category detection failed:", e);
+      return null;
+    }
+  }
+
   async function generate() {
     if (!productInfo.trim() && uploadedFiles.length === 0 && imageData.length === 0) {
       return setError("Opisz swój produkt lub wgraj załączniki z danymi (instrukcje, zdjęcia).");
@@ -1639,6 +1693,17 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
       onSaveListing?.(newListing, marketplace, productInfo);
       setReferenceBullets([parsed.bullet1||"", parsed.bullet2||"", parsed.bullet3||"", parsed.bullet4||"", parsed.bullet5||""]);
       setReferenceDescription(parsed.description || "");
+
+      // Auto-detect category from listing
+      if (btg) {
+        setStatus("Wykrywanie kategorii produktu...");
+        const detectedCategoryId = await detectCategoryFromListing(newListing, btg, mp);
+        if (detectedCategoryId) {
+          setSelectedCategory(detectedCategoryId);
+          setCategoryAttrs({});
+        }
+      }
+
       setStatus("");
     } catch (e) {
       const msg = e.message || "";
