@@ -49,6 +49,71 @@ const ATTR_LABELS = {
   furniture_finish: "Wykończenie mebla",
 };
 
+const FORBIDDEN_WORDS = {
+  // Universal forbidden words (checked across all marketplaces)
+  universal: [
+    "100% natural", "100% quality guaranteed", "AIDS", "ADD", "added value", "ADHD", "Alzheimers", "antibacterial", "antifungal", "anti-bacterial", "anti-fungal", "anti-microbial", "anxiety", "approved", "arrive faster", "attention deficit disorder", "authentic", "award winning",
+    "bacteria", "best deal", "best price", "best seller", "best selling", "big sale", "biodegradable", "biological contaminants", "bpa free", "brand new", "buy now", "buy with confidence",
+    "cancer", "cataract", "certified", "closeout", "close-out", "compostable", "concussion", "coronavirus", "covid", "COVID-19", "cure",
+    "decomposable", "degradable", "depression", "detoxification", "detoxify", "disease", "don't miss out",
+    "eco friendly", "ecofriendly", "eco-friendly", "environmentally friendly", "etc.",
+    "fall sale", "fda approval", "fed ex", "filter", "flawless", "free gift", "free shipping", "fungal", "fungicide", "fungus",
+    "gift idea", "great as", "great for", "green", "guarantee", "guaranteed",
+    "hassle free", "heal", "hepatitis", "herpes", "highest rated", "hiv", "hot item", "huge sale",
+    "imported from", "inflammation", "influenza",
+    "lasting quality", "limited time offer",
+    "made in", "mail rebate", "make excellent", "makes awesome", "makes great", "makes perfect", "makes spectacular", "makes wonderful", "massive sale", "money back guarantee",
+    "natural", "newest version", "now together",
+    "on sale", "overstock", "over-stock",
+    "patented", "perfect for", "perfect gift", "pesticide", "platinum", "plus free", "professional quality", "proven",
+    "quality", "ready to ship", "recommended by", "remedies", "remedy", "retail box",
+    "sanitize", "sanitizes", "satisfaction", "save $", "save cash", "save money", "seasonal affective disorder", "seen on tv", "ships faster", "shop with confidence", "special offer", "special promo", "spring sale", "supplies won't last", "super sale",
+    "tested", "the clap", "top notch", "top quality", "top rated", "top selling", "toxic", "toxin", "toxins", "treat", "treatment",
+    "unbeatable price", "ups", "used",
+    "weight loss", "wholesale price", "winter sale", "within hours", "worlds best"
+  ],
+  // Language-specific variants
+  DE: ["beste", "bestpreis", "qualität garantiert", "heilung", "heilen", "heilmittel", "zugelassen", "bewährt", "versandkosten frei", "kostenlos"],
+  FR: ["meilleur", "meilleur prix", "qualité garantie", "guérison", "guérir", "remède", "approuvé", "gratuit", "port gratuit"],
+  IT: ["migliore", "miglior prezzo", "qualità garantita", "guarigione", "guarire", "rimedio", "approvato", "gratuito", "spedizione gratuita"],
+  ES: ["mejor", "mejor precio", "calidad garantizada", "curación", "curar", "remedio", "aprobado", "gratis", "envío gratis"],
+  NL: ["beste", "beste prijs", "kwaliteit gegarandeerd", "genezing", "genezen", "geneesmiddel", "goedgekeurd", "gratis", "gratis verzending"],
+  SE: ["bästa", "bästa pris", "kvalitet garanterad", "läkning", "läka", "läkemedel", "godkänd", "gratis", "fri frakt"],
+  PL: ["najlepszy", "najlepsza cena", "gwarancja jakości", "uzdrowienie", "uzdrawiać", "lek", "zatwierdzony", "darmowy", "darmowa wysyłka"],
+  EN: ["best", "best price", "quality guaranteed", "cure", "healing", "remedy", "approved", "free", "free shipping"],
+};
+
+function checkForbiddenWords(text, forbiddenList) {
+  const issues = [];
+  if (!text || !forbiddenList) return issues;
+
+  const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, ""); // Normalize punctuation
+  const textWords = lower.split(/\s+/).filter(w => w.length > 0);
+
+  for (const phrase of forbiddenList) {
+    const phraseNorm = phrase.toLowerCase().replace(/[^a-z0-9\s]/g, "");
+    const phraseWords = phraseNorm.split(/\s+/).filter(w => w.length > 0);
+
+    if (phraseWords.length === 1) {
+      // Single word check
+      if (textWords.includes(phraseWords[0])) {
+        issues.push(`Zakazane słowo Amazon: "${phrase}"`);
+      }
+    } else {
+      // Multi-word phrase check
+      for (let i = 0; i <= textWords.length - phraseWords.length; i++) {
+        const match = textWords.slice(i, i + phraseWords.length).join(" ");
+        if (match === phraseWords.join(" ")) {
+          issues.push(`Zakazane zwrot Amazon: "${phrase}"`);
+          break;
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 function byteCount(s) { return new TextEncoder().encode(s || "").length; }
 
 // German stemmer for inflected form detection
@@ -1236,6 +1301,14 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         if (longBenefits.length > 0) issues.push(`Benefits: ${longBenefits.length} benefit(ów) przekracza 6 słów. Zkrócić wszystkie benefity do maksymalnie 6 słów każdy.`);
       }
 
+      // Check for forbidden Amazon words
+      const allText = [parsed.title, parsed.bullet1, parsed.bullet2, parsed.bullet3, parsed.bullet4, parsed.bullet5, parsed.description, parsed.backendKeywords].join(" ");
+      const forbiddenList = FORBIDDEN_WORDS.universal.concat(FORBIDDEN_WORDS[mp.code] || []);
+      const forbiddenIssues = checkForbiddenWords(allText, forbiddenList);
+      if (forbiddenIssues.length > 0) {
+        issues.push(`Zakazane słowa Amazon: ${forbiddenIssues.slice(0, 3).join(", ")}${forbiddenIssues.length > 3 ? ` (+ ${forbiddenIssues.length - 3} więcej)` : ""}`);
+      }
+
       if (issues.length > 0) {
         setStatus("Optymalizacja — rozbudowywanie listingu...");
         const refinementPrompt = `The listing you generated has these issues:
@@ -1249,6 +1322,7 @@ For the title: add secondary keywords, features, or use cases to reach 160-200 c
 For bullets: the TOTAL of all 5 bullets MUST be between 950-1000 characters. HARD LIMIT: 1000 max. Each bullet should be 180-200 chars. If over 1000, shorten the longest bullets. If under 950, add details.
 For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember: no words already in title or bullets, no brand names, no stop words, NO DUPLICATE WORDS.
 For benefits: EXACTLY 4 benefits, each maximum 6 words. They must be short, punchy selling points highlighting product advantages. Make them benefit-focused, not feature-focused.
+CRITICAL - Forbidden Words: REMOVE any Amazon-forbidden words like: best seller, best price, approved, guaranteed, top rated, limited time, sale, cure, heal, sanitize, etc. Replace with alternative phrasing that conveys the same benefit WITHOUT using forbidden words. Examples: instead of "best seller" use "bestselling" or "customer favorite"; instead of "guaranteed" use "backed by warranty" or "reliable".
 
 Respond ONLY with the improved JSON, same format:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"...","benefits":["benefit1","benefit2","benefit3","benefit4"]}`;
