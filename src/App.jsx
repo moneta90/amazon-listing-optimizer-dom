@@ -49,6 +49,71 @@ const ATTR_LABELS = {
   furniture_finish: "Wykończenie mebla",
 };
 
+const FORBIDDEN_WORDS = {
+  // Universal forbidden words (checked across all marketplaces)
+  universal: [
+    "100% natural", "100% quality guaranteed", "AIDS", "ADD", "added value", "ADHD", "Alzheimers", "antibacterial", "antifungal", "anti-bacterial", "anti-fungal", "anti-microbial", "anxiety", "approved", "arrive faster", "attention deficit disorder", "authentic", "award winning",
+    "bacteria", "best deal", "best price", "best seller", "best selling", "big sale", "biodegradable", "biological contaminants", "bpa free", "brand new", "buy now", "buy with confidence",
+    "cancer", "cataract", "certified", "closeout", "close-out", "compostable", "concussion", "coronavirus", "covid", "COVID-19", "cure",
+    "decomposable", "degradable", "depression", "detoxification", "detoxify", "disease", "don't miss out",
+    "eco friendly", "ecofriendly", "eco-friendly", "environmentally friendly", "etc.",
+    "fall sale", "fda approval", "fed ex", "filter", "flawless", "free gift", "free shipping", "fungal", "fungicide", "fungus",
+    "gift idea", "great as", "great for", "green", "guarantee", "guaranteed",
+    "hassle free", "heal", "hepatitis", "herpes", "highest rated", "hiv", "hot item", "huge sale",
+    "imported from", "inflammation", "influenza",
+    "lasting quality", "limited time offer",
+    "made in", "mail rebate", "make excellent", "makes awesome", "makes great", "makes perfect", "makes spectacular", "makes wonderful", "massive sale", "money back guarantee",
+    "natural", "newest version", "now together",
+    "on sale", "overstock", "over-stock",
+    "patented", "perfect for", "perfect gift", "pesticide", "platinum", "plus free", "professional quality", "proven",
+    "quality", "ready to ship", "recommended by", "remedies", "remedy", "retail box",
+    "sanitize", "sanitizes", "satisfaction", "save $", "save cash", "save money", "seasonal affective disorder", "seen on tv", "ships faster", "shop with confidence", "special offer", "special promo", "spring sale", "supplies won't last", "super sale",
+    "tested", "the clap", "top notch", "top quality", "top rated", "top selling", "toxic", "toxin", "toxins", "treat", "treatment",
+    "unbeatable price", "ups", "used",
+    "weight loss", "wholesale price", "winter sale", "within hours", "worlds best"
+  ],
+  // Language-specific variants
+  DE: ["beste", "bestpreis", "qualität garantiert", "heilung", "heilen", "heilmittel", "zugelassen", "bewährt", "versandkosten frei", "kostenlos"],
+  FR: ["meilleur", "meilleur prix", "qualité garantie", "guérison", "guérir", "remède", "approuvé", "gratuit", "port gratuit"],
+  IT: ["migliore", "miglior prezzo", "qualità garantita", "guarigione", "guarire", "rimedio", "approvato", "gratuito", "spedizione gratuita"],
+  ES: ["mejor", "mejor precio", "calidad garantizada", "curación", "curar", "remedio", "aprobado", "gratis", "envío gratis"],
+  NL: ["beste", "beste prijs", "kwaliteit gegarandeerd", "genezing", "genezen", "geneesmiddel", "goedgekeurd", "gratis", "gratis verzending"],
+  SE: ["bästa", "bästa pris", "kvalitet garanterad", "läkning", "läka", "läkemedel", "godkänd", "gratis", "fri frakt"],
+  PL: ["najlepszy", "najlepsza cena", "gwarancja jakości", "uzdrowienie", "uzdrawiać", "lek", "zatwierdzony", "darmowy", "darmowa wysyłka"],
+  EN: ["best", "best price", "quality guaranteed", "cure", "healing", "remedy", "approved", "free", "free shipping"],
+};
+
+function checkForbiddenWords(text, forbiddenList) {
+  const issues = [];
+  if (!text || !forbiddenList) return issues;
+
+  const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, ""); // Normalize punctuation
+  const textWords = lower.split(/\s+/).filter(w => w.length > 0);
+
+  for (const phrase of forbiddenList) {
+    const phraseNorm = phrase.toLowerCase().replace(/[^a-z0-9\s]/g, "");
+    const phraseWords = phraseNorm.split(/\s+/).filter(w => w.length > 0);
+
+    if (phraseWords.length === 1) {
+      // Single word check
+      if (textWords.includes(phraseWords[0])) {
+        issues.push(`Zakazane słowo Amazon: "${phrase}"`);
+      }
+    } else {
+      // Multi-word phrase check
+      for (let i = 0; i <= textWords.length - phraseWords.length; i++) {
+        const match = textWords.slice(i, i + phraseWords.length).join(" ");
+        if (match === phraseWords.join(" ")) {
+          issues.push(`Zakazane zwrot Amazon: "${phrase}"`);
+          break;
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 function byteCount(s) { return new TextEncoder().encode(s || "").length; }
 
 // German stemmer for inflected form detection
@@ -348,8 +413,6 @@ function ListingPreview({ listing }) {
   const backendScore = Math.min(100, Math.round((bBytes / 250) * 100));
   const overall = Math.round((titleScore + bulletScore + backendScore) / 3);
 
-  const allBullets = listing.bullets.filter(b => b.trim()).join("\n");
-
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
@@ -374,7 +437,7 @@ function ListingPreview({ listing }) {
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <SectionHead copyText={allBullets} copyLabel="wszystkie punkty">Punkty kluczowe (Bullet Points)</SectionHead>
+        <SectionHead>Punkty kluczowe (Bullet Points)</SectionHead>
         {listing.bullets.map((b, i) => (
           <div key={i} style={{
             padding: "8px 12px", marginBottom: 6, background: "#0d0e14", borderRadius: 6,
@@ -408,10 +471,7 @@ function ListingPreview({ listing }) {
 
       {listing.benefits?.length > 0 && listing.benefits.some(b => b.trim()) && (
         <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${S.border}` }}>
-          <SectionHead
-            copyText={listing.benefits.filter(b => b.trim()).join(" | ")}
-            copyLabel="benefity"
-          >
+          <SectionHead>
             🎯 Benefity (4 główne zalety)
           </SectionHead>
           <div style={{ display: "grid", gap: 8 }}>
@@ -1023,7 +1083,7 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
     }
   }
 
-  function buildPrompt(mp, catInfo, brandValue, compatTitle, compatBulletExt) {
+  function buildPrompt(mp, catInfo, brandValue, compatTitle, compatBulletExt, categoryAttrs) {
     return `You are a world-class Amazon listing optimizer specializing in European marketplaces. You have deep expertise in Amazon's A9/A10 algorithm, Rufus, and Cosmo AI systems.
 
 TARGET MARKETPLACE: ${mp.code} (${mp.langEn})
@@ -1048,7 +1108,7 @@ ${compatTitle || compatBulletExt ? `COMPATIBILITY INFORMATION (for marketplace $
   - PL: "Kompatybilny z"
 - CRITICAL: Bullet #5 MUST focus ONLY on compatibility. Use format: "Kompatibel mit [devices] – Diese Filter sind speziell entwickelt und getestet für [type]. Perfekte Ergänzung für [use cases]."
 - Include compatibility info in title ONLY if space available AFTER all other required info (after character 70).` : ""}
-${catInfo ? `CATEGORY: ${catInfo.path}\nitem_type_keyword: ${catInfo.item_type}\nCategory attributes: ${catInfo.attrs.join(", ")}` : ""}
+${catInfo ? `CATEGORY: ${catInfo.path}\nitem_type_keyword: ${catInfo.item_type}\nCategory attributes: ${catInfo.attrs.join(", ")}${categoryAttrs && Object.keys(categoryAttrs).length > 0 ? `\nCategory attribute values provided by user:\n${Object.entries(categoryAttrs).filter(([,v]) => v).map(([k, v]) => `- ${ATTR_LABELS[k] || k}: ${v}`).join("\n")}\n\nUse these attribute values naturally in the title and bullets where relevant.` : ""}` : ""}
 ${csvKeywords ? `\nHELIUM 10 KEYWORD DATA (sorted by search volume):\n${csvKeywords.slice(0, 30).map((k, i) => `${i + 1}. "${k.keyword}" (vol: ${k.volume})`).join("\n")}\nUse the top keywords strategically: #1-3 in title, #4-15 in bullets, rest in backend/description.` : ""}
 ${uploadedFiles.filter(f => f.type === "text").length > 0 ? `\nADDITIONAL PRODUCT INFORMATION FROM UPLOADED FILES (NOTE: these files may be in a different language than the target marketplace — use them ONLY as an information source, extract product details from them, but ALWAYS write the listing in ${mp.langEn}):\n${uploadedFiles.filter(f => f.type === "text").map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}`).join("\n\n")}` : ""}
 ${imageData.length > 0 ? `\nIMAGES ATTACHED: ${imageData.length} image(s) showing the product. Analyze them carefully to extract product details, features, text, specifications, and any visible information that should be included in the listing.` : ""}
@@ -1200,7 +1260,7 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
     try {
       const mp = MARKETPLACES.find(m => m.code === marketplace);
       const catInfo = selectedCategory && btg?.category_attrs[selectedCategory];
-      const prompt = buildPrompt(mp, catInfo, brand, compatibilityTitle, compatibilityBulletExt);
+      const prompt = buildPrompt(mp, catInfo, brand, compatibilityTitle, compatibilityBulletExt, categoryAttrs);
 
       // Build message with optional images
       let userContent;
@@ -1241,6 +1301,14 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         if (longBenefits.length > 0) issues.push(`Benefits: ${longBenefits.length} benefit(ów) przekracza 6 słów. Zkrócić wszystkie benefity do maksymalnie 6 słów każdy.`);
       }
 
+      // Check for forbidden Amazon words
+      const allText = [parsed.title, parsed.bullet1, parsed.bullet2, parsed.bullet3, parsed.bullet4, parsed.bullet5, parsed.description, parsed.backendKeywords].join(" ");
+      const forbiddenList = FORBIDDEN_WORDS.universal.concat(FORBIDDEN_WORDS[mp.code] || []);
+      const forbiddenIssues = checkForbiddenWords(allText, forbiddenList);
+      if (forbiddenIssues.length > 0) {
+        issues.push(`Zakazane słowa Amazon: ${forbiddenIssues.slice(0, 3).join(", ")}${forbiddenIssues.length > 3 ? ` (+ ${forbiddenIssues.length - 3} więcej)` : ""}`);
+      }
+
       if (issues.length > 0) {
         setStatus("Optymalizacja — rozbudowywanie listingu...");
         const refinementPrompt = `The listing you generated has these issues:
@@ -1254,6 +1322,7 @@ For the title: add secondary keywords, features, or use cases to reach 160-200 c
 For bullets: the TOTAL of all 5 bullets MUST be between 950-1000 characters. HARD LIMIT: 1000 max. Each bullet should be 180-200 chars. If over 1000, shorten the longest bullets. If under 950, add details.
 For backend keywords: brainstorm ALL possible synonyms, alternate names, related categories, compatible products, use cases — pack it to 240-250 bytes. Remember: no words already in title or bullets, no brand names, no stop words, NO DUPLICATE WORDS.
 For benefits: EXACTLY 4 benefits, each maximum 6 words. They must be short, punchy selling points highlighting product advantages. Make them benefit-focused, not feature-focused.
+CRITICAL - Forbidden Words: REMOVE any Amazon-forbidden words like: best seller, best price, approved, guaranteed, top rated, limited time, sale, cure, heal, sanitize, etc. Replace with alternative phrasing that conveys the same benefit WITHOUT using forbidden words. Examples: instead of "best seller" use "bestselling" or "customer favorite"; instead of "guaranteed" use "backed by warranty" or "reliable".
 
 Respond ONLY with the improved JSON, same format:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"...","benefits":["benefit1","benefit2","benefit3","benefit4"]}`;
@@ -1613,6 +1682,29 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
         placeholder="np. Thermomix Zubehör, Rutschfest, Acryl Unterlage..."
         helper="Oddzielone przecinkami. Zostaną wplecione w dalszą część tytułu, bullety i opis." />
 
+      {/* Category Attributes Section */}
+      {selectedCategory && btg?.category_attrs[selectedCategory] && btg.category_attrs[selectedCategory].attrs.length > 0 && (
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${S.border}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: S.accent, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+            📦 ATRYBUTY KATEGORII (OPCJONALNIE)
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            {btg.category_attrs[selectedCategory].attrs.map(attr => (
+              <Field
+                key={attr}
+                label={ATTR_LABELS[attr] || attr}
+                value={categoryAttrs[attr] || ""}
+                onChange={v => setCategoryAttrs({...categoryAttrs, [attr]: v})}
+                placeholder={`np. ${attr === "color_map" ? "Czarny" : attr === "size_name" ? "Medium" : "wartość"}`}
+              />
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: S.muted, fontStyle: "italic" }}>
+            Atrybuty kategorii: {btg.category_attrs[selectedCategory].attrs.map(a => ATTR_LABELS[a] || a).join(", ")}
+          </div>
+        </div>
+      )}
+
       {/* Compatibility Section */}
       <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${S.border}` }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: S.accent, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
@@ -1809,6 +1901,7 @@ export default function App() {
   const [model, setModel] = useState("meta-llama/llama-4-scout-17b-16e-instruct");
   const [btg, setBtg] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryAttrs, setCategoryAttrs] = useState({});
   const [secondaryKeywords, setSecondaryKeywords] = useState("");
   const [csvKeywords, setCsvKeywords] = useState(null);
   const [listing, setListing] = useState({
@@ -1855,6 +1948,11 @@ export default function App() {
       .then(d => setBtg(d))
       .catch(() => console.warn("Nie udało się załadować danych BTG"));
   }, []);
+
+  // Clear category attrs when selectedCategory changes
+  useEffect(() => {
+    setCategoryAttrs({});
+  }, [selectedCategory]);
 
   return (
     <div style={{ minHeight: "100vh", background: S.bg, color: S.text, fontFamily: S.font }}>
