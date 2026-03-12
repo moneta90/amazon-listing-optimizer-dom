@@ -503,7 +503,7 @@ function ExcelInjector({ listing }) {
 function ListingPreview({ listing }) {
   if (!listing) return null;
   const tLen = listing.title.length;
-  const titleScore = Math.min(100, Math.max(0, (tLen > 10 && tLen <= 200) ? 100 - Math.max(0, tLen - 180) * 2 : tLen > 200 ? 20 : 0));
+  const titleScore = tLen > 200 ? 20 : tLen >= 160 ? 100 : tLen > 10 ? Math.round((tLen / 160) * 85) : 0;
   const bulletScore = listing.bullets.filter(b => b.trim().length > 0).length * 20;
   const bBytes = byteCount(listing.backendKeywords);
   const backendScore = Math.min(100, Math.round((bBytes / 250) * 100));
@@ -948,7 +948,7 @@ Respond ONLY with valid JSON. No backticks, no preamble, no explanation:
 {"title":"...","bullet1":"...","bullet2":"...","bullet3":"...","bullet4":"...","bullet5":"...","description":"...","backendKeywords":"..."}
 
 FINAL CHECK before responding:
-- Is the title 160-200 characters? If under 140, ADD more keywords/features.
+- Is the title 160-200 characters? If under 160, ADD more keywords/features.
 - Does the first 70 chars clearly identify the product?
 - Is the TOTAL of all 5 bullets between 950-1000 characters? HARD LIMIT: 1000 chars max. If over 1000, SHORTEN bullets. If under 950, EXPAND them. Count carefully.
 - Are backend keywords 240-250 bytes? If under 235, you MUST add more words. Think harder about synonyms, related categories, use cases.
@@ -1007,7 +1007,7 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
       const backendBytes = byteCount(parsed.backendKeywords || "");
 
       const issues = [];
-      if (titleLen < 130) issues.push(`Title is only ${titleLen} chars — expand to 160-200 chars by adding more keywords and features.`);
+      if (titleLen < 160) issues.push(`Title is only ${titleLen} chars — this is too short. Expand to 160-200 chars by adding more keywords, features, or use cases.`);
       if (bulletsTotal > 1000) issues.push(`Bullets total is ${bulletsTotal} chars — this EXCEEDS the HARD LIMIT of 1000 characters. You MUST shorten the bullets to fit within 950-1000 characters total. Trim the longest bullets first while keeping key information.`);
       else if (bulletsTotal < 950) issues.push(`Bullets total only ${bulletsTotal} chars — this is TOO SHORT. Each bullet MUST be 190-200 characters. EXPAND every bullet with more specific details: exact dimensions, weight, materials, compatible models, certifications, use cases. Target: 950-1000 chars total.`);
       if (backendBytes < 235) issues.push(`Backend keywords only ${backendBytes}/250 bytes — you MUST add more words to reach 240-250 bytes. Brainstorm: synonyms, related categories, compatible products, use cases, materials, locations, actions. NO duplicates, NO words from title/bullets.`);
