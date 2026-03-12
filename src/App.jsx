@@ -1260,8 +1260,8 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         .filter(w => w.length >= 3 && !stopWords.has(w));
       const uniqueWords = [...new Set(words)].slice(0, 30);
 
-      // Score each category by how many words from listing match its path/item_type
-      // item_type_keyword match counts 3x more (it's the most specific identifier)
+      // Score each category by keyword match
+      // item_type_keyword match counts 3x more (most specific identifier)
       const scored = btgData.categories.map(cat => {
         const itemTypeLower = cat.item_type.toLowerCase();
         const pathLower = cat.path.toLowerCase();
@@ -1273,10 +1273,26 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         return { ...cat, score };
       });
 
-      // Sort by score descending, take top 40 (with at least score > 0 first, then fallback)
       scored.sort((a, b) => b.score - a.score);
-      const matched = scored.filter(c => c.score > 0).slice(0, 40);
-      const candidates = matched.length >= 5 ? matched : scored.slice(0, 40);
+
+      // Identify the top section (e.g. "Kitchen & Dining") from best-scoring categories
+      const topSectionScores = {};
+      for (const cat of scored.slice(0, 20)) {
+        const section = (cat.path.split(" > ")[0] || "").trim();
+        topSectionScores[section] = (topSectionScores[section] || 0) + cat.score;
+      }
+      const topSection = Object.entries(topSectionScores).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+
+      // From the top section, take ALL categories (re-scored), up to 80
+      const sectionCats = topSection
+        ? scored.filter(c => c.path.startsWith(topSection)).slice(0, 80)
+        : [];
+
+      // Merge: top section cats + top global matches, deduplicated
+      const seen = new Set();
+      const candidates = [...sectionCats, ...scored.filter(c => c.score > 0)]
+        .filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; })
+        .slice(0, 80);
 
       const categoryList = candidates
         .map((cat, idx) => `${idx + 1}. [${cat.id}] ${cat.path} (item_type_keyword: ${cat.item_type})`)
@@ -2081,6 +2097,7 @@ export default function App() {
                 onSaveListing={saveToHistory} />
               {listing.title && <ListingPreview listing={listing} />}
               {csvKeywords && listing.title && <KeywordUsageTable keywords={csvKeywords} listing={listing} secondaryKeywords={secondaryKeywords} setSecondaryKeywords={setSecondaryKeywords} />}
+              <div style={{ marginTop: 8, marginBottom: 20, borderTop: `1px solid ${S.border}` }} />
               <CategoryBrowser btg={btg} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} />
             </>
           )}
