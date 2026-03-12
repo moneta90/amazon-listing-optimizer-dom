@@ -1260,20 +1260,34 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         .filter(w => w.length >= 3 && !stopWords.has(w));
       const uniqueWords = [...new Set(words)].slice(0, 30);
 
-      // Score each category by keyword match
+      // Score each category by keyword match (fuzzy + substring)
       // item_type_keyword match counts 3x more (most specific identifier)
       const scored = btgData.categories.map(cat => {
         const itemTypeLower = cat.item_type.toLowerCase();
         const pathLower = cat.path.toLowerCase();
+        const itemTypeWords = itemTypeLower.split(/[-_\s]+/).filter(x => x.length >= 2);
+        const pathWords = pathLower.split(/[-_\s>]+/).filter(x => x.length >= 2);
+
         let score = 0;
         for (const w of uniqueWords) {
-          if (itemTypeLower.includes(w)) score += w.length * 3; // item_type match = 3x weight
-          else if (pathLower.includes(w)) score += w.length;    // path match = 1x weight
+          // Exact substring match (most precise)
+          if (itemTypeLower.includes(w)) score += w.length * 3;
+          else if (pathLower.includes(w)) score += w.length;
+          // Word-level match (for compound words like "water-bottle" or "water bottle")
+          else {
+            for (const iw of itemTypeWords) {
+              if (iw.startsWith(w) || w.startsWith(iw)) score += Math.min(w.length, iw.length) * 2;
+            }
+            for (const pw of pathWords) {
+              if (pw.startsWith(w) || w.startsWith(pw)) score += Math.min(w.length, pw.length) * 0.5;
+            }
+          }
         }
         return { ...cat, score };
       });
 
       scored.sort((a, b) => b.score - a.score);
+      console.log(`[BTG] Top 10 categories by score for "${listing.title}":`, scored.slice(0, 10).map(c => `${c.item_type}(${c.score.toFixed(1)})`));
 
       // Identify the top section (e.g. "Kitchen & Dining") from best-scoring categories
       const topSectionScores = {};
