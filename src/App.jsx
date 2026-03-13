@@ -525,6 +525,206 @@ function ListingPreview({ listing }) {
 }
 
 /* ═══════════════════════════════════════════
+   CSV KEYWORD PICKER
+   ═══════════════════════════════════════════ */
+
+function CsvKeywordPicker({ keywords, mainKeyword, setMainKeyword, secondaryKeywords, setSecondaryKeywords }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("volume");
+  const [sortDir, setSortDir] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PER_PAGE = 20;
+
+  const selectedSet = useMemo(() => {
+    if (!secondaryKeywords) return new Set();
+    return new Set(secondaryKeywords.split(",").map(k => k.trim().toLowerCase()).filter(k => k.length > 0));
+  }, [secondaryKeywords]);
+
+  const filtered = useMemo(() => {
+    let arr = [...keywords];
+    if (search) arr = arr.filter(k => k.keyword.toLowerCase().includes(search.toLowerCase()));
+    arr.sort((a, b) => {
+      const av = sortBy === "keyword" ? a.keyword.toLowerCase() : (a[sortBy] || 0);
+      const bv = sortBy === "keyword" ? b.keyword.toLowerCase() : (b[sortBy] || 0);
+      return sortDir === "desc" ? (av > bv ? -1 : 1) : (av < bv ? -1 : 1);
+    });
+    return arr;
+  }, [keywords, search, sortBy, sortDir]);
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const pageKws = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const toggleSort = (col) => {
+    if (sortBy === col) setSortDir(d => d === "desc" ? "asc" : "desc");
+    else { setSortBy(col); setSortDir("desc"); }
+    setCurrentPage(1);
+  };
+
+  const toggleSecondary = (kw) => {
+    const lower = kw.toLowerCase();
+    if (selectedSet.has(lower)) {
+      const updated = (secondaryKeywords || "").split(",").map(k => k.trim()).filter(k => k.toLowerCase() !== lower).join(", ");
+      setSecondaryKeywords(updated);
+    } else {
+      setSecondaryKeywords(secondaryKeywords ? `${secondaryKeywords}, ${kw}` : kw);
+    }
+  };
+
+  const toggleMain = (kw) => {
+    setMainKeyword(mainKeyword === kw ? "" : kw);
+  };
+
+  const selCount = selectedSet.size;
+  const hasMain = !!mainKeyword;
+
+  const SortTh = ({ col, label, align = "left" }) => (
+    <th onClick={() => toggleSort(col)} style={{
+      padding: "7px 10px", textAlign: align, cursor: "pointer", whiteSpace: "nowrap",
+      color: sortBy === col ? "#f59e0b" : S.muted, fontWeight: 600, fontSize: 11,
+      borderBottom: `1px solid ${S.border}`, background: sortBy === col ? "#1a1b2440" : "transparent",
+      userSelect: "none",
+    }}>
+      {label} {sortBy === col ? (sortDir === "desc" ? "↓" : "↑") : ""}
+    </th>
+  );
+
+  return (
+    <div style={{ marginBottom: 16, borderRadius: 12, border: "1px solid #22c55e40", background: "#0a0b10", overflow: "hidden" }}>
+      {/* Header row */}
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{
+          padding: "10px 16px", background: "#22c55e0d", display: "flex", alignItems: "center",
+          justifyContent: "space-between", cursor: "pointer", gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 16 }}>📊</span>
+          <span style={{ fontWeight: 700, fontSize: 13, color: "#22c55e" }}>Wybierz słowa kluczowe z Helium 10</span>
+          <span style={{ fontSize: 11, color: S.dim }}>
+            {keywords.length} słów
+            {hasMain && <span style={{ color: "#a3e635", marginLeft: 6 }}>⭐ główne: {mainKeyword}</span>}
+            {selCount > 0 && <span style={{ color: "#22c55e", marginLeft: 6 }}>• {selCount} secondary</span>}
+          </span>
+        </div>
+        <span style={{ color: "#22c55e", fontSize: 12 }}>{collapsed ? "▶ Rozwiń" : "▼ Zwiń"}</span>
+      </div>
+
+      {!collapsed && (
+        <div style={{ padding: "12px 16px" }}>
+          {/* Search + stats bar */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+              placeholder="Filtruj słowa kluczowe..."
+              style={{
+                flex: 1, minWidth: 180, padding: "6px 10px", background: S.input,
+                border: `1px solid ${S.border}`, borderRadius: 8, color: S.text, fontSize: 12,
+              }}
+            />
+            {(selCount > 0 || hasMain) && (
+              <button
+                onClick={() => { setSecondaryKeywords(""); setMainKeyword(""); }}
+                style={{ padding: "5px 10px", background: "#ef444415", border: "1px solid #ef444440", borderRadius: 6, color: "#ef4444", fontSize: 11, cursor: "pointer" }}
+              >
+                ✕ Wyczyść wszystko
+              </button>
+            )}
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: S.mono }}>
+              <thead>
+                <tr style={{ background: "#0d0e14" }}>
+                  <th style={{ padding: "7px 8px", textAlign: "center", width: 32, borderBottom: `1px solid ${S.border}`, color: S.muted, fontSize: 11 }} title="Ustaw jako główne słowo kluczowe (Main Keyword)">⭐</th>
+                  <th style={{ padding: "7px 8px", textAlign: "center", width: 32, borderBottom: `1px solid ${S.border}`, color: S.muted, fontSize: 11 }} title="Dodaj do Secondary Keywords">✓</th>
+                  <SortTh col="keyword" label="Słowo kluczowe" />
+                  <SortTh col="volume" label="Wolumen" align="right" />
+                  {keywords[0]?.cerebroScore !== undefined && <SortTh col="cerebroScore" label="IQ Score" align="right" />}
+                  {keywords[0]?.organicRank !== undefined && <SortTh col="organicRank" label="Org. Rank" align="right" />}
+                </tr>
+              </thead>
+              <tbody>
+                {pageKws.map(kw => {
+                  const isMain = mainKeyword === kw.keyword;
+                  const isSec = selectedSet.has(kw.keyword.toLowerCase());
+                  const rowBg = isMain ? "#a3e63518" : isSec ? "#22c55e10" : "#14151e";
+                  return (
+                    <tr key={kw.keyword} style={{ borderBottom: `1px solid #1a1b24`, background: rowBg, transition: "background 0.15s" }}>
+                      {/* Main star */}
+                      <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                        <button
+                          onClick={() => toggleMain(kw.keyword)}
+                          title={isMain ? "Usuń jako główne" : "Ustaw jako główne słowo kluczowe"}
+                          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, lineHeight: 1, opacity: isMain ? 1 : 0.2, filter: isMain ? "none" : "grayscale(1)", transition: "opacity 0.15s" }}
+                        >⭐</button>
+                      </td>
+                      {/* Secondary checkbox */}
+                      <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={isSec}
+                          onChange={() => toggleSecondary(kw.keyword)}
+                          title={isSec ? "Usuń z Secondary Keywords" : "Dodaj do Secondary Keywords"}
+                          style={{ cursor: "pointer", width: 14, height: 14 }}
+                        />
+                      </td>
+                      {/* Keyword name */}
+                      <td
+                        onClick={() => toggleSecondary(kw.keyword)}
+                        style={{ padding: "6px 10px", cursor: "pointer", color: isMain ? "#a3e635" : isSec ? "#e5e7eb" : "#6b7280", fontWeight: isMain ? 700 : isSec ? 500 : 400 }}
+                      >
+                        {kw.keyword}
+                        {isMain && <span style={{ marginLeft: 6, fontSize: 9, color: "#a3e635", fontWeight: 700, textTransform: "uppercase" }}>główne</span>}
+                      </td>
+                      {/* Volume */}
+                      <td style={{ padding: "6px 10px", textAlign: "right", color: S.muted }}>{kw.volume > 0 ? kw.volume.toLocaleString() : "—"}</td>
+                      {keywords[0]?.cerebroScore !== undefined && <td style={{ padding: "6px 10px", textAlign: "right", color: S.muted }}>{kw.cerebroScore > 0 ? kw.cerebroScore.toFixed(1) : "—"}</td>}
+                      {keywords[0]?.organicRank !== undefined && <td style={{ padding: "6px 10px", textAlign: "right", color: S.muted }}>{kw.organicRank > 0 ? kw.organicRank : "—"}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: "flex", gap: 6, marginTop: 12, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                style={{ padding: "5px 10px", background: currentPage === 1 ? "#1e2028" : S.input, border: `1px solid ${S.border}`, borderRadius: 6, color: currentPage === 1 ? "#4b5563" : S.text, cursor: currentPage === 1 ? "default" : "pointer", fontSize: 11 }}>
+                ← Poprzednia
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button key={page} onClick={() => setCurrentPage(page)}
+                  style={{ padding: "5px 10px", background: page === currentPage ? S.accent : S.input, border: `1px solid ${page === currentPage ? S.accent : S.border}`, borderRadius: 6, color: page === currentPage ? "#000" : S.text, cursor: "pointer", fontSize: 11, fontWeight: page === currentPage ? 700 : 400 }}>
+                  {page}
+                </button>
+              ))}
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                style={{ padding: "5px 10px", background: currentPage === totalPages ? "#1e2028" : S.input, border: `1px solid ${S.border}`, borderRadius: 6, color: currentPage === totalPages ? "#4b5563" : S.text, cursor: currentPage === totalPages ? "default" : "pointer", fontSize: 11 }}>
+                Następna →
+              </button>
+            </div>
+          )}
+
+          {/* Summary of selected */}
+          {(hasMain || selCount > 0) && (
+            <div style={{ marginTop: 12, padding: "8px 12px", background: "#1a1b24", borderRadius: 8, fontSize: 11, color: S.muted, lineHeight: 1.6 }}>
+              {hasMain && <div><span style={{ color: "#a3e635", fontWeight: 600 }}>⭐ Główne:</span> <span style={{ color: S.text }}>{mainKeyword}</span></div>}
+              {selCount > 0 && <div><span style={{ color: "#22c55e", fontWeight: 600 }}>✓ Secondary ({selCount}):</span> <span style={{ color: S.text }}>{secondaryKeywords}</span></div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    KEYWORD USAGE TABLE
    ═══════════════════════════════════════════ */
 
@@ -990,11 +1190,7 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
           .sort((a, b) => b.volume - a.volume);
 
         setCsvKeywords(keywords);
-        // Auto-fill main keyword and secondary
-        if (keywords.length > 0 && !mainKeyword) setMainKeyword(keywords[0].keyword);
-        if (keywords.length > 1 && !secondaryKeywords) {
-          setSecondaryKeywords(keywords.slice(1, 10).map(k => k.keyword).join(", "));
-        }
+        // Keywords are NOT auto-filled — user picks them from CsvKeywordPicker below
       } catch { setError("Błąd parsowania pliku CSV."); }
     };
     reader.readAsText(file);
@@ -1974,6 +2170,17 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
           CSV: eksport z Helium 10 (Cerebro/Magnet). Zdjęcia: pudełko, listing, produkt. Tekst: opis copywritera, instrukcja.
         </div>
       </div>
+
+      {/* CSV Keyword Picker — shown after CSV upload, replaces auto-fill */}
+      {csvKeywords && (
+        <CsvKeywordPicker
+          keywords={csvKeywords}
+          mainKeyword={mainKeyword}
+          setMainKeyword={setMainKeyword}
+          secondaryKeywords={secondaryKeywords}
+          setSecondaryKeywords={setSecondaryKeywords}
+        />
+      )}
 
       {referenceBullets && (
         <div style={{ 
