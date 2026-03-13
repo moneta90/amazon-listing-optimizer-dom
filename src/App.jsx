@@ -131,6 +131,90 @@ function stemUniversal(word) {
 // Keep for backward compatibility
 function stemGerman(word) { return stemUniversal(word); }
 
+const BTG_DOMAIN_LABELS = {
+  baby: "Baby",
+  fashion: "Fashion",
+  garden: "Garden",
+  industrial: "Industrial",
+  kitchen: "Kitchen & Home",
+  "office-products": "Office",
+  "pet-supplies": "Pet Supplies",
+  sports: "Sports",
+  "tools-sgp": "Tools",
+};
+
+const BTG_DOMAIN_MATCH_TERMS = {
+  baby: ["baby", "kinder", "kinderartikel", "infant", "newborn", "bebe", "bébé", "niemowle", "dziecko"],
+  fashion: ["fashion", "mode", "moda", "clothing", "apparel", "bekleidung", "odziez", "ubrania"],
+  garden: ["garden", "garten", "jardin", "ogród", "outdoor", "patio", "terrasse", "taras"],
+  industrial: ["industrial", "industrie", "przemysl", "workshop", "atelier", "warsztat", "commercial", "gewerbe"],
+  kitchen: ["kitchen", "küche", "cuisine", "kuchnia", "home", "haus", "haushalt", "maison", "dom"],
+  "office-products": ["office", "büro", "bureau", "biuro", "papeterie", "stationery", "papiernicze"],
+  "pet-supplies": ["pet", "haustier", "animaux", "zwierze", "pies", "kot", "dog", "cat"],
+  sports: ["sport", "sports", "fitness", "outdoor sport", "camping", "training", "trening"],
+  "tools-sgp": ["tools", "werkzeug", "outils", "narzedzia", "baumarkt", "majsterkowanie", "hardware"],
+};
+
+const BTG_DOMAIN_KEYWORDS = {
+  baby: ["baby", "niemowle", "niemowl", "dziecko", "dzieciecy", "infant", "newborn", "bebe", "bebek", "nino", "nina", "kids", "stroller", "pram", "car seat", "autositz", "wozek"],
+  fashion: ["fashion", "moda", "odziez", "ubran", "clothing", "apparel", "dress", "shirt", "hoodie", "pants", "buty", "shoes", "sneakers", "jacke", "kleid", "koszula"],
+  garden: ["garden", "ogrod", "ogrodowy", "gardening", "outdoor", "patio", "terrace", "balkon", "pflanze", "roslin", "grill", "lawn", "watering", "hose", "garten"],
+  industrial: ["industrial", "przemysl", "warsztat", "workshop", "lab", "laboratory", "b2b", "commercial", "safety", "schutz", "hygiene", "restaurant", "gastronomy", "medical"],
+  kitchen: ["kitchen", "home", "household", "haus", "haushalt", "kuchnia", "dom", "cleaning", "bathroom", "coffee", "cookware", "dekoracja", "storage", "mop", "vacuum"],
+  "office-products": ["office", "biuro", "papier", "printer", "drukarka", "desk", "notebook", "planner", "label", "laminator", "school", "schul", "stationery"],
+  "pet-supplies": ["pet", "zwierzat", "pies", "kot", "dog", "cat", "aquarium", "bird", "hamster", "krolik", "futter", "napf", "leash", "harness"],
+  sports: ["sport", "fitness", "gym", "yoga", "camping", "outdoor sport", "bicycle", "bike", "rower", "running", "pilka", "swimming", "ski", "workout"],
+  "tools-sgp": ["tools", "tool", "narzedzia", "majsterkowanie", "baumarkt", "drill", "saw", "hammer", "screw", "wrench", "elektronarzedzia", "workbench", "measuring"],
+};
+
+const BTG_SEMANTIC_MAP = [
+  { from: ["reiniger","reinigung","reinigt","reinigen","pulizia","pulitore","limpiador","limpieza","nettoyant","nettoyage","środek","czyszczący","czyszczenia","schoonmaakmiddel","rengöringsmedel","środki"], to: ["cleaner","cleaners","cleaning","reiniger","reinigung"] },
+  { from: ["tabletten","tablette","tablet","pastiglie","pastilla","pastilles","tabs","tab","blocco","bloc","block","kostki","kostka"], to: ["tablet","tabs","block","stone","tabletten"] },
+  { from: ["wc","klo","klosett","toilette","toaleta","toalet","sanitär","sanitaire","bagno","baño","salle","bain"], to: ["toilet","bathroom","toilette","bad"] },
+  { from: ["entkalker","entkalkung","anticalcare","anticalcaire","descalcificador","odkamieniacz","kalkverwijderaar","avkalkningsmedel"], to: ["descaler","descaling","limescale","entkalker","entkalkung"] },
+  { from: ["wasserfilter","filtre","filtro","filtr","waterfilter","vattenfilter","filter"], to: ["filter","water","wasser","wasserfilter"] },
+  { from: ["duft","parfum","profumo","fragancia","zapach","geur","doft","scent"], to: ["scent","fragrance","duft","parfum"] },
+  { from: ["antibakteriell","antibacterien","antibacterial","antibatterico","antybakteryjny"], to: ["antibacterial","antimicrobial"] },
+  { from: ["haushalt","ménage","hogar","casa","domowy","huishoud","hushåll"], to: ["household","home","haushalt","haus"] },
+  { from: ["küche","cuisine","cocina","cucina","kuchnia","keuken","kök"], to: ["kitchen","kuche","küche"] },
+  { from: ["bad","badezimmer","salle de bain","baño","bagno","łazienka","badkamer","badrum"], to: ["bathroom","bath","badezimmer","bad"] },
+  { from: ["spülmaschine","lave-vaisselle","lavavajillas","lavastoviglie","zmywarka","vaatwasser","diskmaskin"], to: ["dishwasher","spulmaschine","spülmaschine"] },
+  { from: ["waschmaschine","lave-linge","lavadora","lavatrice","pralka","wasmachine","tvättmaskin"], to: ["washing","laundry","waschmaschine"] },
+  { from: ["flasche","bouteille","botella","bottiglia","butelka","fles","flaska"], to: ["bottle","flasche"] },
+  { from: ["schneidbrett","planche","tabla","tagliere","deska","snijplank","skärbräda"], to: ["cutting","board","schneidbrett"] },
+  { from: ["kaffee","café","caffè","kawa","koffie","kaffe"], to: ["coffee","kaffee"] },
+  { from: ["espresso","kaffeemaschine","machine","macchina","máquina","ekspres","koffiezetapparaat"], to: ["coffee","espresso","machine","kaffeemaschine"] },
+  { from: ["staubsauger","aspirapolvere","aspirateur","aspiradora","odkurzacz","stofzuiger","dammsugare"], to: ["vacuum","cleaner","staubsauger"] },
+  { from: ["beutel","sac","bolsa","sacchetto","worek","zak","påse","tüte","tüten"], to: ["bag","bags","beutel"] },
+  { from: ["säge","scie","sierra","sega","piła","zaag","såg","astsäge","astschere"], to: ["saw","pruner","pruning","cutter","sage","säge"] },
+  { from: ["garten","jardin","jardín","giardino","ogród","tuin","trädgård"], to: ["garden","gardening","outdoor","garten"] },
+  { from: ["baum","arbre","árbol","albero","drzewo","boom","träd"], to: ["tree","branch","pruning","baum"] },
+  { from: ["schere","cisaille","tijera","cesoia","nożyce","schaar","sax"], to: ["shears","scissors","cutter","pruner","schere"] },
+  { from: ["teleskop","telescopique","telescópico","telescopico","teleskopowy","telescopisch","teleskopisk"], to: ["telescoping","extendable","pole","teleskop"] },
+  { from: ["gants","handschuhe","rekawice","rękawice","guanti","guantes","gloves"], to: ["gloves","handschuhe"] },
+  { from: ["chaussures","schuhe","buty","shoes","scarpe","zapatos"], to: ["shoes","schuhe"] },
+  { from: ["robe","kleid","dress","sukienka","vestido"], to: ["dress","kleid"] },
+  { from: ["laisse","leine","smycz","leash","guinzaglio","correa"], to: ["leash","leine"] },
+  { from: ["lit","bett","bed","lozko","łóżko","cama","letto"], to: ["bed","bett"] },
+  { from: ["bureau","schreibtisch","desk","biurko","scrivania","escritorio"], to: ["desk","schreibtisch"] },
+];
+
+function normalizeSearchText(text) {
+  return (text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function tokenizeSearchText(text) {
+  return normalizeSearchText(text)
+    .split(/\s+/)
+    .filter(token => token.length >= 2);
+}
+
 /* ═══════════════════════════════════════════
    MAŁE KOMPONENTY
    ═══════════════════════════════════════════ */
@@ -256,9 +340,18 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
 
   const filtered = useMemo(() => {
     if (!btg || !search.trim()) return [];
-    const q = search.toLowerCase();
+    const q = normalizeSearchText(search);
     return btg.categories
-      .filter(c => c.path.toLowerCase().includes(q) || c.item_type.toLowerCase().includes(q))
+      .filter((c) => {
+        const haystack = [
+          c.path,
+          c.item_type,
+          c.domain,
+          BTG_DOMAIN_LABELS[c.domain] || c.domain,
+          ...(BTG_DOMAIN_MATCH_TERMS[c.domain] || []),
+        ].join(" ");
+        return normalizeSearchText(haystack).includes(q);
+      })
       .slice(0, 30);
   }, [btg, search]);
 
@@ -287,7 +380,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
           <div style={{ fontSize: 11, color: S.dim }}>
             {categorySuggestions?.length > 0 && !categoryLocked
               ? "Wybierz kategorię z propozycji lub wyszukaj ręcznie"
-              : "Wyszukaj kategorię z Browse Tree Guide — atrybuty załadują się automatycznie"}
+              : "Wyszukaj kategorię z połączonych plików Browse Tree Guide — atrybuty załadują się automatycznie"}
           </div>
         </div>
       </div>
@@ -319,6 +412,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                       </div>
                       <div style={{ fontSize: 11, color: S.dim, marginTop: 2, fontFamily: S.mono }}>
                         item_type: <span style={{ color: S.accent }}>{sug.item_type}</span>
+                        {sug.domain && <span> · {BTG_DOMAIN_LABELS[sug.domain] || sug.domain}</span>}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: S.dim, whiteSpace: "nowrap", fontFamily: S.mono }}>
@@ -331,7 +425,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
           </div>
           {categorySuggestions[0]?.lowConfidence && (
             <div style={{ marginTop: 8, padding: "8px 12px", background: "#f59e0b15", border: "1px solid #f59e0b30", borderRadius: 8, fontSize: 11, color: "#f59e0b" }}>
-              ⚠️ Niska pewność dopasowania — plik BTG obejmuje tylko <strong>Home & Kitchen</strong>. Jeśli Twój produkt należy do innej kategorii (Garden & Outdoor, Tools, Sports itp.), wyszukaj ręcznie poniżej lub pomiń kategorię.
+              ⚠️ Niska pewność dopasowania — żadna kategoria z dostępnych plików BTG nie wygląda na mocny match. Warto sprawdzić ręcznie wyniki poniżej.
             </div>
           )}
           <div style={{ fontSize: 10, color: S.dim, marginTop: 8 }}>
@@ -348,7 +442,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
             value={categoryLocked && selCat ? selCat.path : search}
             onChange={e => { setSearch(e.target.value); setShowDropdown(true); }}
             onFocus={() => !categoryLocked && setShowDropdown(true)}
-            placeholder={categoryLocked ? "Kategoria zablokowana" : "Szukaj kategorii np. cutting board, candle, pillow..."}
+            placeholder={categoryLocked ? "Kategoria zablokowana" : "Szukaj kategorii np. hose, organizer, pet bed, work gloves..."}
             style={{
               width: "100%", padding: "12px 14px 12px 38px", background: categoryLocked ? S.muted + "15" : S.input,
               border: `1px solid ${categoryLocked ? S.border + "80" : S.border}`,
@@ -388,6 +482,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                 <div style={{ fontWeight: 500 }}>{cat.path}</div>
                 <div style={{ fontSize: 11, color: S.dim, marginTop: 2 }}>
                   item_type_keyword: <span style={{ color: S.accent }}>{cat.item_type}</span>
+                  {cat.domain && <span> · {BTG_DOMAIN_LABELS[cat.domain] || cat.domain}</span>}
                   {cat.attr_count > 0 && <span> · {cat.attr_count} atrybutów</span>}
                 </div>
               </button>
@@ -403,6 +498,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
           borderRadius: 8, marginBottom: 12, fontSize: 13, color: S.accent, fontWeight: 500,
         }}>
           📂 {selCat.path}
+          {selCat.domain && <span style={{ color: S.dim }}> · {BTG_DOMAIN_LABELS[selCat.domain] || selCat.domain}</span>}
         </div>
       )}
 
@@ -1297,81 +1393,91 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
   function detectCategorySuggestions(listing, btgData) {
     if (!btgData || !btgData.categories) return [];
 
-    // Extract meaningful words from title + bullets + backend keywords
-    const stopWords = new Set(["the","and","for","with","from","that","this","are","not","but","all","its","also","into","only","sehr","und","für","mit","von","eine","einen","einer","einem","ist","das","die","der","des","dem","ein","auch","oraz","dla","do","ze","się","jest","jak","lub","czy","nie"]);
-    const allText = [listing.title || "", (listing.bullets || []).join(" "), listing.backendKeywords || ""].join(" ");
-    const words = allText
-      .toLowerCase()
-      .replace(/[^a-ząćęłńóśźżäöüßéèêëàâçîïôùûñáíóú\s]/g, " ")
-      .split(/\s+/)
-      .filter(w => w.length >= 3 && !stopWords.has(w));
-    const uniqueWords = [...new Set(words)].slice(0, 40);
+    const stopWords = new Set([
+      "the","and","for","with","from","that","this","are","not","but","all","its","also","into","only",
+      "sehr","und","fur","mit","von","eine","einen","einer","einem","ist","das","die","der","des","dem","ein","auch",
+      "oraz","dla","do","ze","sie","jest","jak","lub","czy","nie","or","per","con","pour","avec","los","las","del","dei",
+    ]);
+    const sourceTexts = [
+      productInfo || "",
+      mainKeyword || "",
+      secondaryKeywords || "",
+      compatibilityTitle || "",
+      compatibilityBulletExt || "",
+      listing.title || "",
+      (listing.bullets || []).join(" "),
+      listing.backendKeywords || "",
+      uploadedFiles.filter(f => f.type === "text").map(f => `${f.name} ${f.content.slice(0, 800)}`).join(" "),
+      csvKeywords ? csvKeywords.slice(0, 25).map(k => k.keyword).join(" ") : "",
+    ].join(" ");
 
-    // Semantic translation: multilingual listing words → English BTG category words
-    const semanticMap = [
-      { from: ["reiniger","reinigung","reinigt","reinigen","pulizia","pulitore","limpiador","limpieza","nettoyant","nettoyage","środek","czyszczący","czyszczenia","schoonmaakmiddel","rengöringsmedel","środki"], to: ["cleaner","cleaners","cleaning"] },
-      { from: ["tabletten","tablette","tablet","pastiglie","pastilla","pastilles","tabs","tab","blocco","bloc","block","kostki","kostka"], to: ["tablet","tabs","block","stone"] },
-      { from: ["wc","klo","klosett","toilette","toaleta","toalet","sanitär","sanitaire","bagno","baño","salle","bain"], to: ["toilet","bathroom"] },
-      { from: ["entkalker","entkalkung","anticalcare","anticalcaire","descalcificador","odkamieniacz","kalkverwijderaar","avkalkningsmedel"], to: ["descaler","descaling","limescale"] },
-      { from: ["wasserfilter","filtre","filtro","filtr","waterfilter","vattenfilter","filter"], to: ["filter","water"] },
-      { from: ["duft","parfum","profumo","fragancia","zapach","geur","doft","scent"], to: ["scent","fragrance"] },
-      { from: ["antibakteriell","antibacterien","antibacterial","antibatterico","antybakteryjny"], to: ["antibacterial","antimicrobial"] },
-      { from: ["haushalt","ménage","hogar","casa","domowy","huishoud","hushåll"], to: ["household","home"] },
-      { from: ["küche","cuisine","cocina","cucina","kuchnia","keuken","kök"], to: ["kitchen"] },
-      { from: ["bad","badezimmer","salle de bain","baño","bagno","łazienka","badkamer","badrum"], to: ["bathroom","bath"] },
-      { from: ["spülmaschine","lave-vaisselle","lavavajillas","lavastoviglie","zmywarka","vaatwasser","diskmaskin"], to: ["dishwasher"] },
-      { from: ["waschmaschine","lave-linge","lavadora","lavatrice","pralka","wasmachine","tvättmaskin"], to: ["washing","laundry"] },
-      { from: ["flasche","bouteille","botella","bottiglia","butelka","fles","flaska"], to: ["bottle"] },
-      { from: ["schneidbrett","planche","tabla","tagliere","deska","snijplank","skärbräda"], to: ["cutting","board"] },
-      { from: ["kaffee","café","café","caffè","kawa","koffie","kaffe"], to: ["coffee"] },
-      { from: ["espresso","kaffeemaschine","machine","macchina","máquina","ekspres","koffiezetapparaat"], to: ["coffee","espresso","machine"] },
-      { from: ["staubsauger","aspirapolvere","aspirateur","aspiradora","odkurzacz","stofzuiger","dammsugare"], to: ["vacuum","cleaner"] },
-      { from: ["beutel","sac","bolsa","sacchetto","worek","zak","påse","tüte","tüten"], to: ["bag","bags"] },
-      { from: ["säge","scie","sierra","sega","piła","zaag","såg","astsäge","astschere"], to: ["saw","pruner","pruning","cutter"] },
-      { from: ["garten","jardin","jardín","giardino","ogród","tuin","trädgård"], to: ["garden","gardening","outdoor"] },
-      { from: ["baum","arbre","árbol","albero","drzewo","boom","träd"], to: ["tree","branch","pruning"] },
-      { from: ["schere","cisaille","tijera","cesoia","nożyce","schaar","sax"], to: ["shears","scissors","cutter","pruner"] },
-      { from: ["teleskop","telescopique","telescópico","telescopico","teleskopowy","telescopisch","teleskopisk"], to: ["telescoping","extendable","pole"] },
-    ];
+    const baseWords = tokenizeSearchText(sourceTexts)
+      .filter((word) => word.length >= 3 && !stopWords.has(word))
+      .slice(0, 200);
+    const expandedWords = new Set(baseWords);
 
-    // Build expanded word set
-    const expandedWords = new Set(uniqueWords);
-    for (const { from, to } of semanticMap) {
-      for (const fw of from) {
-        if (uniqueWords.some(w => w.includes(fw) || fw.includes(w))) {
-          to.forEach(tw => expandedWords.add(tw));
+    for (const { from, to } of BTG_SEMANTIC_MAP) {
+      for (const source of from) {
+        const normalizedSource = normalizeSearchText(source);
+        if (baseWords.some((word) => word.includes(normalizedSource) || normalizedSource.includes(word))) {
+          to.forEach((token) => expandedWords.add(normalizeSearchText(token)));
         }
       }
     }
-    const allMatchWords = [...expandedWords];
+
+    const domainScores = {};
+    for (const [domain, keywords] of Object.entries(BTG_DOMAIN_KEYWORDS)) {
+      let score = 0;
+      for (const keyword of keywords) {
+        const normalizedKeyword = normalizeSearchText(keyword);
+        if (!normalizedKeyword) continue;
+        if (expandedWords.has(normalizedKeyword)) score += normalizedKeyword.length * 3;
+        else if ([...expandedWords].some((word) => word.includes(normalizedKeyword) || normalizedKeyword.includes(word))) score += normalizedKeyword.length;
+      }
+      domainScores[domain] = score;
+    }
+    const bestDomainScore = Math.max(...Object.values(domainScores), 0);
+    const likelyDomains = new Set(
+      Object.entries(domainScores)
+        .filter(([, score]) => score > 0 && score >= bestDomainScore * 0.55)
+        .map(([domain]) => domain)
+    );
+    const matchWords = [...expandedWords];
 
     // Score each category
     const scored = btgData.categories
       .filter(cat => btgData.category_attrs[cat.id]) // Only categories with attrs
       .map(cat => {
-        const itemTypeLower = cat.item_type.toLowerCase();
-        const pathLower = cat.path.toLowerCase();
-        const itemTypeWords = itemTypeLower.split(/[-_\s]+/).filter(x => x.length >= 2);
-        const pathWords = pathLower.split(/[-_\s>]+/).filter(x => x.length >= 2);
+        const itemTypeLower = normalizeSearchText(cat.item_type);
+        const pathLower = normalizeSearchText(cat.path);
+        const domainLower = normalizeSearchText(cat.domain || "");
+        const domainTerms = normalizeSearchText((BTG_DOMAIN_MATCH_TERMS[cat.domain] || []).join(" "));
+        const itemTypeWords = itemTypeLower.split(/\s+/).filter(x => x.length >= 2);
+        const pathWords = pathLower.split(/\s+/).filter(x => x.length >= 2);
 
         let score = 0;
-        for (const w of allMatchWords) {
+        for (const w of matchWords) {
           if (itemTypeLower.includes(w)) score += w.length * 3;
-          else if (pathLower.includes(w)) score += w.length;
+          else if (pathLower.includes(w)) score += w.length * 1.4;
+          else if (domainLower.includes(w)) score += w.length;
+          else if (domainTerms.includes(w)) score += w.length * 1.2;
           else {
             for (const iw of itemTypeWords) {
               if (iw.startsWith(w) || w.startsWith(iw)) score += Math.min(w.length, iw.length) * 2;
             }
             for (const pw of pathWords) {
-              if (pw.startsWith(w) || w.startsWith(pw)) score += Math.min(w.length, pw.length) * 0.5;
+              if (pw.startsWith(w) || w.startsWith(pw)) score += Math.min(w.length, pw.length) * 0.8;
             }
           }
         }
 
+        if (likelyDomains.has(cat.domain)) score += Math.max(18, bestDomainScore * 0.35);
+        else if (bestDomainScore > 0) score -= 8;
+
         // Penalize irrelevant category words
         const penaltyWords = ["storage","container","paper","holder","rack","stand","organizer","hanger","shelf"];
         for (const pw of penaltyWords) {
-          if (itemTypeLower.includes(pw) && !allMatchWords.some(w => w.includes(pw))) {
+          if (itemTypeLower.includes(pw) && !matchWords.some(w => w.includes(pw))) {
             score -= pw.length * 4;
           }
         }
@@ -1390,8 +1496,9 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
       id: c.id,
       path: btgData.category_attrs[c.id].path,
       item_type: c.item_type,
+      domain: c.domain,
       score: c.score,
-      lowConfidence: bestScore < 30, // BTG may not cover this product category
+      lowConfidence: bestScore < 45,
     }));
   }
 
