@@ -77,6 +77,17 @@ Jeśli chcesz zaktualizować dane kategorii:
 3. Zastąp plik `public/btg-data.json`
 4. Push na GitHub — Vercel automatycznie wdroży nową wersję
 
+## Cloudflare Pages - sekrety AI
+
+Aplikacja może korzystać z proxy po stronie Cloudflare Pages Functions zamiast wysyłać klucze API z przeglądarki.
+
+Ustaw w Cloudflare Pages -> `Settings` -> `Variables and Secrets`:
+
+- `GEMINI_API_KEY`
+- `GROQ_API_KEY`
+
+Frontend woła wtedy lokalny endpoint `/api/ai`, a klucze zostają po stronie serwera. W `localhost` można nadal użyć ręcznego klucza jako fallback developerski.
+
 ## Technologie
 
 - **React 18** + **Vite** — frontend

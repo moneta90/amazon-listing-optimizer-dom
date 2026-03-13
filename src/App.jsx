@@ -945,6 +945,7 @@ function HistoryPanel({ entries, onLoad, onDelete }) {
 function SettingsPanel({ provider, setProvider, apiKey, setApiKey, geminiKey, setGeminiKey, model, setModel }) {
   const [showKey, setShowKey] = useState(false);
   const models = provider === "gemini" ? GEMINI_MODELS : GROQ_MODELS;
+  const canUseLocalKeyOverride = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   function switchProvider(p) {
     setProvider(p);
@@ -989,32 +990,37 @@ function SettingsPanel({ provider, setProvider, apiKey, setApiKey, geminiKey, se
         </div>
       </div>
 
-      {/* API Key */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#c4c8d0", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {provider === "gemini" ? "Klucz API Google Gemini" : "Klucz API Groq"}
-        </label>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={provider === "gemini" ? geminiKey : apiKey}
-            onChange={e => provider === "gemini" ? setGeminiKey(e.target.value) : setApiKey(e.target.value)}
-            type={showKey ? "text" : "password"}
-            placeholder={provider === "gemini" ? "AIza..." : "gsk_..."}
-            style={{
-              flex: 1, padding: "12px 14px", background: S.input, border: `1px solid ${S.border}`,
-              borderRadius: 8, color: S.text, fontSize: 14, fontFamily: S.mono, outline: "none", boxSizing: "border-box",
-            }} />
-          <button onClick={() => setShowKey(!showKey)} style={{
-            padding: "0 14px", background: S.input, border: `1px solid ${S.border}`, borderRadius: 8,
-            color: S.muted, cursor: "pointer", fontSize: 16,
-          }}>{showKey ? "🙈" : "👁"}</button>
-        </div>
-        <div style={{ fontSize: 11, color: S.dim, marginTop: 4 }}>
-          {provider === "gemini"
-            ? <>Darmowy klucz z <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener" style={{ color: S.accent, textDecoration: "none" }}>aistudio.google.com/api-keys</a></>
-            : <>Darmowy klucz z <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style={{ color: S.accent, textDecoration: "none" }}>console.groq.com/keys</a></>
-          }
-        </div>
+      <div style={{
+        marginBottom: 16, padding: "12px 14px", background: "#101823", border: "1px solid #1f3a5f",
+        borderRadius: 10, fontSize: 12, color: "#b9d7ff", lineHeight: 1.6,
+      }}>
+        Produkcja korzysta teraz z kluczy API trzymanych po stronie Cloudflare jako sekrety. Klucz nie jest już wysyłany do przeglądarki.
       </div>
+
+      {canUseLocalKeyOverride && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#c4c8d0", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {provider === "gemini" ? "Lokalny override klucza Gemini" : "Lokalny override klucza Groq"}
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input value={provider === "gemini" ? geminiKey : apiKey}
+              onChange={e => provider === "gemini" ? setGeminiKey(e.target.value) : setApiKey(e.target.value)}
+              type={showKey ? "text" : "password"}
+              placeholder={provider === "gemini" ? "AIza..." : "gsk_..."}
+              style={{
+                flex: 1, padding: "12px 14px", background: S.input, border: `1px solid ${S.border}`,
+                borderRadius: 8, color: S.text, fontSize: 14, fontFamily: S.mono, outline: "none", boxSizing: "border-box",
+              }} />
+            <button onClick={() => setShowKey(!showKey)} style={{
+              padding: "0 14px", background: S.input, border: `1px solid ${S.border}`, borderRadius: 8,
+              color: S.muted, cursor: "pointer", fontSize: 16,
+            }}>{showKey ? "🙈" : "👁"}</button>
+          </div>
+          <div style={{ fontSize: 11, color: S.dim, marginTop: 4 }}>
+            To pole działa tylko lokalnie jako fallback developerski. Na Cloudflare używany jest sekret serwerowy.
+          </div>
+        </div>
+      )}
 
       {/* Model selection */}
       <div>
@@ -1147,28 +1153,35 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
   }
 
   async function callAI(messages) {
-    let url, headers, body;
+    const isGemma = provider === "gemini" && model.startsWith("gemma");
+    const body = {
+      provider,
+      model,
+      messages,
+      temperature: 0.7,
+      maxTokens: provider === "gemini" ? 8192 : 3000,
+      ...(isGemma ? {} : { responseFormat: { type: "json_object" } }),
+    };
 
-    if (provider === "gemini") {
-      url = `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`;
-      headers = { "Content-Type": "application/json", "Authorization": `Bearer ${geminiKey}` };
-      const isGemma = model.startsWith("gemma");
-      body = {
-        model: model,
-        messages: messages,
+    const isLocalhost = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    const localOverrideKey = provider === "gemini" ? geminiKey : apiKey;
+    const useDirectFallback = isLocalhost && localOverrideKey.trim();
+
+    let url = "/api/ai";
+    let headers = { "Content-Type": "application/json" };
+    let requestBody = body;
+
+    if (useDirectFallback) {
+      url = provider === "gemini"
+        ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        : "https://api.groq.com/openai/v1/chat/completions";
+      headers = { "Content-Type": "application/json", "Authorization": `Bearer ${localOverrideKey}` };
+      requestBody = {
+        model,
+        messages,
         temperature: 0.7,
-        max_tokens: 8192,
+        max_tokens: provider === "gemini" ? 8192 : 3000,
         ...(isGemma ? {} : { response_format: { type: "json_object" } }),
-      };
-    } else {
-      url = "https://api.groq.com/openai/v1/chat/completions";
-      headers = { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` };
-      body = {
-        model: model,
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 3000,
-        response_format: { type: "json_object" },
       };
     }
 
@@ -1176,7 +1189,7 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
     const timeoutId = setTimeout(() => controller.abort(), 90_000); // 90s timeout
     let res;
     try {
-      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });
+      res = await fetch(url, { method: "POST", headers, body: JSON.stringify(requestBody), signal: controller.signal });
     } catch (err) {
       if (err.name === "AbortError") throw new Error("Przekroczono limit czasu (90s). Sprawdź połączenie lub spróbuj z krótszym opisem produktu.");
       throw err;
@@ -1185,7 +1198,7 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
     }
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || errData?.error?.status || `Błąd HTTP ${res.status}`;
+      const errMsg = errData?.error?.message || errData?.error?.status || errData?.message || `Błąd HTTP ${res.status}`;
       throw new Error(errMsg);
     }
     const data = await res.json();
@@ -1506,8 +1519,11 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
     if (!productInfo.trim() && uploadedFiles.length === 0 && imageData.length === 0) {
       return setError("Opisz swój produkt lub wgraj załączniki z danymi (instrukcje, zdjęcia).");
     }
+    const isLocalhost = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
     const activeKey = provider === "gemini" ? geminiKey : apiKey;
-    if (!activeKey.trim()) return setError(`Wpisz klucz API ${provider === "gemini" ? "Gemini" : "Groq"} w zakładce ⚙️ Ustawienia.`);
+    if (isLocalhost && !activeKey.trim()) {
+      return setError(`Na localhost podaj klucz API ${provider === "gemini" ? "Gemini" : "Groq"} w zakładce ⚙️ Ustawienia albo uruchom aplikację przez Cloudflare Functions.`);
+    }
     if (!marketplace) return setError("Wybierz marketplace.");
     setError("");
     setLoading(true);
@@ -2183,8 +2199,8 @@ export default function App() {
   const [tab, setTab] = useState("generate");
   const [marketplace, setMarketplace] = useState("DE");
   const [provider, setProvider] = useState("gemini");
-  const [apiKey, setApiKey] = useState("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");
-  const [geminiKey, setGeminiKey] = useState("AIzaSyAWwYa32pHDbxn3aAJc_UBXSP3tblwtpSM");
+  const [apiKey, setApiKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [model, setModel] = useState("gemini-3.1-flash-lite-preview");
   const [btg, setBtg] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
