@@ -233,38 +233,25 @@ function SectionLabel({ children }) {
    MARKETPLACE SELECTOR
    ═══════════════════════════════════════════ */
 
-function MarketplaceSelector({ selected, setSelected, disabled }) {
+function MarketplaceSelector({ selected, setSelected }) {
   return (
-    <div>
-      {disabled && (
-        <div style={{
-          padding: "8px 12px", marginBottom: 12, borderRadius: 6,
-          background: "#d97706", border: "1px solid #b45309", color: "#fff",
-          fontSize: 12, display: "flex", alignItems: "center", gap: 6,
-        }}>
-          <span>🔒</span>
-          <span>Marketplace zablokowany — kategoria jest spiętą z listingiem. Resetuj listing żeby zmienić kraj.</span>
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto" }}>
-        {MARKETPLACES.map(mp => {
-          const on = selected === mp.code;
-          return (
-            <button key={mp.code} onClick={() => setSelected(mp.code)}
-              disabled={disabled}
-              style={{
-                padding: "8px 14px", borderRadius: 8,
-                border: on ? `2px solid ${mp.color}` : `1px solid ${S.border}`,
-                background: on ? `${mp.color}15` : S.input, color: on ? mp.color : S.muted,
-                cursor: disabled ? "not-allowed" : "pointer", fontSize: 13, fontWeight: on ? 700 : 400,
-                display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", fontFamily: S.font,
-              }}>
-              <span style={{ fontSize: 18, letterSpacing: 2 }}>{mp.flags.join("")}</span>
-              <span>{mp.name}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {MARKETPLACES.map(mp => {
+        const on = selected === mp.code;
+        return (
+          <button key={mp.code} onClick={() => setSelected(mp.code)}
+            style={{
+              padding: "8px 14px", borderRadius: 8,
+              border: on ? `2px solid ${mp.color}` : `1px solid ${S.border}`,
+              background: on ? `${mp.color}15` : S.input, color: on ? mp.color : S.muted,
+              cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400,
+              display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", fontFamily: S.font,
+            }}>
+            <span style={{ fontSize: 18, letterSpacing: 2 }}>{mp.flags.join("")}</span>
+            <span>{mp.name}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -961,7 +948,7 @@ function SettingsPanel({ provider, setProvider, apiKey, setApiKey, geminiKey, se
    AI GENERATE PANEL
    ═══════════════════════════════════════════ */
 
-function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, geminiKey, model, btg, selectedCategory, setSelectedCategory, categoryAttrs, setCategoryAttrs, setCategoryLocked, secondaryKeywords, setSecondaryKeywords, csvKeywords, setCsvKeywords, onSaveListing }) {
+function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, geminiKey, model, btg, selectedCategory, setSelectedCategory, categoryAttrs, setCategoryAttrs, categoryLocked, setCategoryLocked, secondaryKeywords, setSecondaryKeywords, csvKeywords, setCsvKeywords, onSaveListing }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [productInfo, setProductInfo] = useState("");
@@ -1784,14 +1771,14 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
       setReferenceBullets([parsed.bullet1||"", parsed.bullet2||"", parsed.bullet3||"", parsed.bullet4||"", parsed.bullet5||""]);
       setReferenceDescription(parsed.description || "");
 
-      // Auto-detect category from listing
-      if (btg) {
+      // Auto-detect category from listing (only on first generation)
+      if (btg && !categoryLocked) {
         setStatus("Wykrywanie kategorii produktu...");
         const detectedCategoryId = await detectCategoryFromListing(newListing, btg, mp);
         if (detectedCategoryId) {
           setSelectedCategory(detectedCategoryId);
           setCategoryAttrs({});
-          setCategoryLocked(true); // Lock category so it doesn't change when switching marketplaces
+          setCategoryLocked(true); // Lock category — keep same category for all marketplaces
         }
       }
 
@@ -1945,6 +1932,34 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
         </div>
       )}
 
+      {categoryLocked && (
+        <div style={{
+          marginBottom: 16, padding: "12px 16px", background: "rgba(34, 197, 94, 0.1)",
+          borderRadius: 12, border: "1px solid rgba(34, 197, 94, 0.3)",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12
+        }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#22c55e", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📂</span> Zablokowana kategoria BTG
+            </div>
+            <div style={{ fontSize: 12, color: "#a1a1aa", marginTop: 4 }}>
+              Kategoria produktu zostanie zachowana dla wszystkich marketplace'ów. Będzie sama dla DE, FR, ES itd.
+            </div>
+          </div>
+          <button
+            onClick={() => { setCategoryLocked(false); setSelectedCategory(null); setCategoryAttrs({}); }}
+            style={{
+              background: "rgba(34, 197, 94, 0.15)", color: "#22c55e", border: "none",
+              padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              transition: "background 0.2s"
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "rgba(34, 197, 94, 0.25)"}
+            onMouseOut={(e) => e.currentTarget.style.background = "rgba(34, 197, 94, 0.15)"}
+          >
+            🔓 Odblokuj
+          </button>
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: "10px 14px", background: "#2d1215", border: "1px solid #7f1d1d", borderRadius: 8, color: "#fca5a5", fontSize: 13, marginBottom: 12 }}>
@@ -2127,7 +2142,7 @@ export default function App() {
         {/* MARKETPLACE */}
         <Card style={{ marginBottom: 20 }}>
           <SectionLabel>Docelowy marketplace</SectionLabel>
-          <MarketplaceSelector selected={marketplace} setSelected={setMarketplace} disabled={categoryLocked} />
+          <MarketplaceSelector selected={marketplace} setSelected={setMarketplace} />
         </Card>
 
         {/* TABS */}
@@ -2148,7 +2163,7 @@ export default function App() {
             <AIGeneratePanel listing={listing} setListing={setListing} marketplace={marketplace}
               provider={provider} apiKey={apiKey} geminiKey={geminiKey} model={model} btg={btg} selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory} categoryAttrs={categoryAttrs} setCategoryAttrs={setCategoryAttrs}
-              setCategoryLocked={setCategoryLocked}
+              categoryLocked={categoryLocked} setCategoryLocked={setCategoryLocked}
               secondaryKeywords={secondaryKeywords} setSecondaryKeywords={setSecondaryKeywords}
               csvKeywords={csvKeywords} setCsvKeywords={setCsvKeywords}
               onSaveListing={saveToHistory} />
