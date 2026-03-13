@@ -143,6 +143,44 @@ const BTG_DOMAIN_LABELS = {
   "tools-sgp": "Tools",
 };
 
+const BTG_DOMAIN_LABELS_PL = {
+  baby: "Baby",
+  fashion: "Moda",
+  garden: "Ogród",
+  industrial: "Przemysł",
+  kitchen: "Dom i kuchnia",
+  "office-products": "Biuro",
+  "pet-supplies": "Zwierzęta",
+  sports: "Sport",
+  "tools-sgp": "Narzędzia",
+};
+
+const BTG_PATH_TRANSLATIONS = [
+  ["Küche, Haushalt & Wohnen", "Dom i kuchnia"],
+  ["Küche, Kochen & Backen", "Kuchnia, gotowanie i pieczenie"],
+  ["Kaffee, Tee & Espresso", "Kawa, herbata i espresso"],
+  ["Kaffeemaschinenersatzteile", "Części zamienne do ekspresów"],
+  ["Kaffeemaschinenzubehör", "Akcesoria do ekspresów"],
+  ["Kaffeemaschinen & -zubereiter", "Ekspresy i zaparzacze do kawy"],
+  ["Reinigungsprodukte", "Produkty czyszczące"],
+  ["Reinigungstabletten", "Tabletki czyszczące"],
+  ["Mahlwerkreinigung", "Czyszczenie młynka"],
+  ["Entkalker", "Odkamieniacze"],
+  ["Reiniger für Milchaufschäumer", "Środki do czyszczenia spieniacza mleka"],
+  ["Wasserfilter & Enthärter", "Filtry i zmiękczacze wody"],
+  ["Wasserfilter", "Filtry do wody"],
+  ["Kaffee- & Espressomaße", "Miarki do kawy i espresso"],
+  ["Fashion", "Moda"],
+  ["Damen", "Kobiety"],
+  ["Bekleidung", "Odzież"],
+  ["Umstandskleidung", "Odzież ciążowa"],
+  ["Kleider", "Sukienki"],
+  ["Abendkleider", "Suknie wieczorowe"],
+  ["Baby", "Baby"],
+  ["Baumarkt", "Narzędzia i dom"],
+  ["Gewerbe, Industrie & Wissenschaft", "Przemysł i nauka"],
+];
+
 const BTG_DOMAIN_MATCH_TERMS = {
   baby: ["baby", "kinder", "kinderartikel", "infant", "newborn", "bebe", "bébé", "niemowle", "dziecko"],
   fashion: ["fashion", "mode", "moda", "clothing", "apparel", "bekleidung", "odziez", "ubrania"],
@@ -213,6 +251,14 @@ function tokenizeSearchText(text) {
   return normalizeSearchText(text)
     .split(/\s+/)
     .filter(token => token.length >= 2);
+}
+
+function translateBtgPathToPolish(path) {
+  let translated = path || "";
+  for (const [source, target] of BTG_PATH_TRANSLATIONS) {
+    translated = translated.replaceAll(source, target);
+  }
+  return translated;
 }
 
 /* ═══════════════════════════════════════════
@@ -408,11 +454,11 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: isTop ? 600 : 400, color: isTop ? "#f59e0b" : S.text, fontFamily: S.font }}>
-                        {isTop && "⭐ "}{sug.path}
+                        {isTop && "⭐ "}{translateBtgPathToPolish(sug.path)}
                       </div>
                       <div style={{ fontSize: 11, color: S.dim, marginTop: 2, fontFamily: S.mono }}>
                         item_type: <span style={{ color: S.accent }}>{sug.item_type}</span>
-                        {sug.domain && <span> · {BTG_DOMAIN_LABELS[sug.domain] || sug.domain}</span>}
+                        {sug.domain && <span> · {BTG_DOMAIN_LABELS_PL[sug.domain] || BTG_DOMAIN_LABELS[sug.domain] || sug.domain}</span>}
                       </div>
                     </div>
                     <div style={{ fontSize: 11, color: S.dim, whiteSpace: "nowrap", fontFamily: S.mono }}>
@@ -479,10 +525,10 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                 background: selectedCategory === cat.id ? "#ff990015" : "transparent",
                 color: S.text, fontSize: 13, fontFamily: S.font, cursor: "pointer", textAlign: "left",
               }}>
-                <div style={{ fontWeight: 500 }}>{cat.path}</div>
+                <div style={{ fontWeight: 500 }}>{translateBtgPathToPolish(cat.path)}</div>
                 <div style={{ fontSize: 11, color: S.dim, marginTop: 2 }}>
                   item_type_keyword: <span style={{ color: S.accent }}>{cat.item_type}</span>
-                  {cat.domain && <span> · {BTG_DOMAIN_LABELS[cat.domain] || cat.domain}</span>}
+                  {cat.domain && <span> · {BTG_DOMAIN_LABELS_PL[cat.domain] || BTG_DOMAIN_LABELS[cat.domain] || cat.domain}</span>}
                   {cat.attr_count > 0 && <span> · {cat.attr_count} atrybutów</span>}
                 </div>
               </button>
@@ -497,8 +543,8 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
           padding: "10px 14px", background: "rgba(34, 197, 94, 0.08)", border: `1px solid rgba(34, 197, 94, 0.3)`,
           borderRadius: 8, marginBottom: 12, fontSize: 13, color: S.accent, fontWeight: 500,
         }}>
-          📂 {selCat.path}
-          {selCat.domain && <span style={{ color: S.dim }}> · {BTG_DOMAIN_LABELS[selCat.domain] || selCat.domain}</span>}
+          📂 {translateBtgPathToPolish(selCat.path)}
+          {selCat.domain && <span style={{ color: S.dim }}> · {BTG_DOMAIN_LABELS_PL[selCat.domain] || BTG_DOMAIN_LABELS[selCat.domain] || selCat.domain}</span>}
         </div>
       )}
 
@@ -1498,11 +1544,11 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
       });
 
     scored.sort((a, b) => b.score - a.score);
-    console.log(`[BTG] Top 10 suggestions for "${listing.title?.slice(0, 60)}":`, scored.slice(0, 10).map(c => `${c.item_type}(${c.score.toFixed(0)})`));
+    console.log(`[BTG] Top 5 suggestions for "${listing.title?.slice(0, 60)}":`, scored.slice(0, 5).map(c => `${c.item_type}(${c.score.toFixed(0)})`));
 
-    // Return top 10 with score > 0
+    // Return top 5 with score > 0
     // Mark as low confidence if best score is weak (product likely outside BTG coverage)
-    const top = scored.filter(c => c.score > 0).slice(0, 10);
+    const top = scored.filter(c => c.score > 0).slice(0, 5);
     const bestScore = top[0]?.score || 0;
     return top.map(c => ({
       id: c.id,
