@@ -97,7 +97,7 @@ def build_dataset(input_dir):
         selected_files.append(path)
 
     categories_by_id = {}
-    category_attrs = defaultdict(lambda: {"item_type": None, "path": None, "attrs": set(), "domain": None})
+    category_attrs = defaultdict(lambda: {"node_id": None, "item_type": None, "path": None, "attrs": [], "domain": None})
     attribute_counter = Counter()
 
     for path in selected_files:
@@ -119,18 +119,20 @@ def build_dataset(input_dir):
             normalized_path = normalize_path(node_path)
             leaf = normalized_path.split(" > ")[-1]
             item_type = slugify(leaf)
-            local_paths[node_id] = (normalized_path, item_type)
+            category_id = f"{domain}:{node_id}"
+            local_paths[node_id] = (category_id, normalized_path, item_type)
 
             category = {
-                "id": node_id,
+                "id": category_id,
+                "node_id": node_id,
                 "path": normalized_path,
                 "item_type": item_type,
                 "attr_count": 0,
                 "domain": domain,
             }
-            previous = categories_by_id.get(node_id)
+            previous = categories_by_id.get(category_id)
             if previous is None or len(normalized_path) > len(previous["path"]):
-                categories_by_id[node_id] = category
+                categories_by_id[category_id] = category
 
         for row in refinement_rows:
             if not row:
@@ -143,28 +145,30 @@ def build_dataset(input_dir):
             if len(row) > 3 and row[3]:
                 attribute = str(row[3]).strip()
 
-            if attribute:
-                category_attrs[node_id]["attrs"].add(attribute)
-                attribute_counter[attribute] += 1
-
             if node_id in local_paths:
-                category_attrs[node_id]["path"] = local_paths[node_id][0]
-                category_attrs[node_id]["item_type"] = local_paths[node_id][1]
-                category_attrs[node_id]["domain"] = domain
+                category_id, normalized_path, item_type = local_paths[node_id]
+                category_attrs[category_id]["node_id"] = node_id
+                category_attrs[category_id]["path"] = normalized_path
+                category_attrs[category_id]["item_type"] = item_type
+                category_attrs[category_id]["domain"] = domain
+                if attribute:
+                    category_attrs[category_id]["attrs"].append(attribute)
+                    attribute_counter[attribute] += 1
 
-    for node_id, category in categories_by_id.items():
-        attr_entry = category_attrs.get(node_id)
+    for category_id, category in categories_by_id.items():
+        attr_entry = category_attrs.get(category_id)
         if attr_entry:
             category["attr_count"] = len(attr_entry["attrs"])
 
     serialized_attrs = {}
-    for node_id, entry in category_attrs.items():
+    for category_id, entry in category_attrs.items():
         if not entry["path"]:
             continue
-        serialized_attrs[node_id] = {
+        serialized_attrs[category_id] = {
+            "node_id": entry["node_id"],
             "item_type": entry["item_type"],
             "path": entry["path"],
-            "attrs": sorted(entry["attrs"]),
+            "attrs": entry["attrs"],
             "domain": entry["domain"],
         }
 

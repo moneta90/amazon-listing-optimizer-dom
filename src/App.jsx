@@ -521,8 +521,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                     padding: "5px 10px", background: "#1e2028", borderRadius: 6,
                     fontSize: 12, color: "#c4c8d0", fontFamily: S.mono, border: "1px solid #2a2d35",
                   }}>
-                    {ATTR_LABELS[a] || a}
-                    <span style={{ color: S.dim, marginLeft: 4, fontSize: 10 }}>({a})</span>
+                    {a}
                   </span>
                 ))}
               </div>
