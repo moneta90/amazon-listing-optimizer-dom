@@ -1164,6 +1164,8 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
   // CSV parser for Helium 10
   function handleCsvUpload(e) {
     const file = e.target.files[0];
+    // Reset input value so the same file can be re-uploaded (e.g. when switching marketplace)
+    e.target.value = null;
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -1199,6 +1201,8 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
   // Text/DOCX/image file reader
   async function handleTextUpload(e) {
     const files = Array.from(e.target.files);
+    // Reset so same files can be re-added after switching marketplace
+    e.target.value = null;
     for (const file of files) {
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
