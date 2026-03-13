@@ -1278,6 +1278,57 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
     }
   }
 
+  async function callAIText(messages, options = {}) {
+    const body = {
+      provider,
+      model,
+      messages,
+      temperature: options.temperature ?? 0.7,
+      maxTokens: options.maxTokens ?? (provider === "gemini" ? 8192 : 3000),
+    };
+
+    const isLocalhost = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    const localOverrideKey = provider === "gemini" ? geminiKey : apiKey;
+    const useDirectFallback = isLocalhost && localOverrideKey.trim();
+
+    let url = "/api/ai";
+    let headers = { "Content-Type": "application/json" };
+    let requestBody = body;
+
+    if (useDirectFallback) {
+      url = provider === "gemini"
+        ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        : "https://api.groq.com/openai/v1/chat/completions";
+      headers = { "Content-Type": "application/json", "Authorization": `Bearer ${localOverrideKey}` };
+      requestBody = {
+        model,
+        messages,
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? (provider === "gemini" ? 8192 : 3000),
+      };
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData?.error?.message || errData?.error?.status || errData?.message || `Błąd HTTP ${res.status}`;
+        throw new Error(errMsg);
+      }
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || "";
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   function buildPrompt(mp, catInfo, brandValue, compatTitle, compatBulletExt, categoryAttrs) {
     return `You are a world-class Amazon listing optimizer specializing in European marketplaces. You have deep expertise in Amazon's A9/A10 algorithm, Rufus, and Cosmo AI systems.
 
@@ -1905,32 +1956,15 @@ Generate ONLY a space-separated list of unique lowercase ${mp.langEn} words. The
 - No stop words, no brand names, no punctuation
 - Total must fit in approximately ${remainingBytes} bytes (special chars like ö,ü,ä,ą,ę = 2 bytes each)
 
-Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-separated lowercase words.`;
+          Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-separated lowercase words.`;
 
           try {
-            const padCtrl = new AbortController();
-            const padTimeout = setTimeout(() => padCtrl.abort(), 30_000); // 30s for pad call
-            const padRes = await fetch(
-              provider === "gemini"
-                ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-                : "https://api.groq.com/openai/v1/chat/completions",
-              {
-                method: "POST",
-                signal: padCtrl.signal,
-                headers: provider === "gemini"
-                  ? { "Content-Type": "application/json", "Authorization": `Bearer ${geminiKey}` }
-                  : { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                  model: model,
-                  messages: [{ role: "user", content: padPrompt }],
-                  temperature: 0.9,
-                  max_tokens: 500,
-                }),
-              }
-            ).finally(() => clearTimeout(padTimeout));
-            if (padRes.ok) {
-              const padData = await padRes.json();
-              const padText = (padData.choices?.[0]?.message?.content || "").toLowerCase().replace(/[^a-ząćęłńóśźżäöüßéèêëàâçîïôùûñáíóúě\s]/g, " ");
+            const padText = (await callAIText(
+              [{ role: "user", content: padPrompt }],
+              { temperature: 0.9, maxTokens: 500, timeoutMs: 30_000 }
+            ))
+              .toLowerCase()
+              .replace(/[^a-ząćęłńóśźżäöüßéèêëàâçîïôùûñáíóúě\s]/g, " ");
               const padWords = padText.split(/\s+/).filter(Boolean);
               const usedWords = new Set([...listingWords, ...result, ...stopWords]);
               const uniquePad = [...new Set(padWords)].filter(w => !usedWords.has(w) && w.length > 2);
@@ -1945,7 +1979,6 @@ Respond with ONLY the words, nothing else. No JSON, no explanation. Just space-s
                 }
               }
               parsed.backendKeywords = padResult.join(" ");
-            }
           } catch { /* silently continue with what we have */ }
         }
       }
