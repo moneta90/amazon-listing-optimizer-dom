@@ -1384,7 +1384,6 @@ Which category from the list BEST matches this product? Respond ONLY with JSON: 
     if (!activeKey.trim()) return setError(`Wpisz klucz API ${provider === "gemini" ? "Gemini" : "Groq"} w zakładce ⚙️ Ustawienia.`);
     if (!marketplace) return setError("Wybierz marketplace.");
     setError("");
-    setCategoryLocked(false); // Reset category lock on new generation
     setLoading(true);
     setStatus("Generowanie listingu...");
 
