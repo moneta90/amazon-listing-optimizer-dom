@@ -233,25 +233,38 @@ function SectionLabel({ children }) {
    MARKETPLACE SELECTOR
    ═══════════════════════════════════════════ */
 
-function MarketplaceSelector({ selected, setSelected }) {
+function MarketplaceSelector({ selected, setSelected, disabled }) {
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      {MARKETPLACES.map(mp => {
-        const on = selected === mp.code;
-        return (
-          <button key={mp.code} onClick={() => setSelected(mp.code)}
-            style={{
-              padding: "8px 14px", borderRadius: 8,
-              border: on ? `2px solid ${mp.color}` : `1px solid ${S.border}`,
-              background: on ? `${mp.color}15` : S.input, color: on ? mp.color : S.muted,
-              cursor: "pointer", fontSize: 13, fontWeight: on ? 700 : 400,
-              display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", fontFamily: S.font,
-            }}>
-            <span style={{ fontSize: 18, letterSpacing: 2 }}>{mp.flags.join("")}</span>
-            <span>{mp.name}</span>
-          </button>
-        );
-      })}
+    <div>
+      {disabled && (
+        <div style={{
+          padding: "8px 12px", marginBottom: 12, borderRadius: 6,
+          background: "#d97706", border: "1px solid #b45309", color: "#fff",
+          fontSize: 12, display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <span>🔒</span>
+          <span>Marketplace zablokowany — kategoria jest spiętą z listingiem. Resetuj listing żeby zmienić kraj.</span>
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto" }}>
+        {MARKETPLACES.map(mp => {
+          const on = selected === mp.code;
+          return (
+            <button key={mp.code} onClick={() => setSelected(mp.code)}
+              disabled={disabled}
+              style={{
+                padding: "8px 14px", borderRadius: 8,
+                border: on ? `2px solid ${mp.color}` : `1px solid ${S.border}`,
+                background: on ? `${mp.color}15` : S.input, color: on ? mp.color : S.muted,
+                cursor: disabled ? "not-allowed" : "pointer", fontSize: 13, fontWeight: on ? 700 : 400,
+                display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s", fontFamily: S.font,
+              }}>
+              <span style={{ fontSize: 18, letterSpacing: 2 }}>{mp.flags.join("")}</span>
+              <span>{mp.name}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2114,7 +2127,7 @@ export default function App() {
         {/* MARKETPLACE */}
         <Card style={{ marginBottom: 20 }}>
           <SectionLabel>Docelowy marketplace</SectionLabel>
-          <MarketplaceSelector selected={marketplace} setSelected={setMarketplace} />
+          <MarketplaceSelector selected={marketplace} setSelected={setMarketplace} disabled={categoryLocked} />
         </Card>
 
         {/* TABS */}
