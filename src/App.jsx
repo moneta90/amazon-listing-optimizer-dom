@@ -266,6 +266,20 @@ function translateBtgPathToPolish(path) {
   return translated;
 }
 
+async function fetchTranslatedBtgPaths(paths) {
+  const res = await fetch("/api/translate-btg", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Błąd HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  return data.translations || {};
+}
+
 /* ═══════════════════════════════════════════
    MAŁE KOMPONENTY
    ═══════════════════════════════════════════ */
@@ -387,6 +401,7 @@ function MarketplaceSelector({ selected, setSelected }) {
 function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryLocked, setCategoryLocked, categorySuggestions, setCategorySuggestions }) {
   const [search, setSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [translatedPaths, setTranslatedPaths] = useState({});
   const ref = useRef(null);
 
   const filtered = useMemo(() => {
@@ -414,6 +429,42 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
 
   const selCat = selectedCategory && btg ? btg.category_attrs[selectedCategory] : null;
   const attrs = selCat ? selCat.attrs : [];
+
+  useEffect(() => {
+    const visiblePaths = [
+      ...(categorySuggestions || []).map((item) => item.path),
+      ...(filtered || []).slice(0, 30).map((item) => item.path),
+      selCat?.path || "",
+    ]
+      .filter(Boolean)
+      .filter((path) => !translatedPaths[path]);
+
+    const uniquePaths = [...new Set(visiblePaths)].slice(0, 30);
+    if (uniquePaths.length === 0) return;
+
+    let active = true;
+    fetchTranslatedBtgPaths(uniquePaths)
+      .then((translations) => {
+        if (!active) return;
+        setTranslatedPaths((prev) => ({
+          ...prev,
+          ...Object.fromEntries(
+            uniquePaths.map((path) => [path, translations[path] || translateBtgPathToPolish(path)])
+          ),
+        }));
+      })
+      .catch(() => {
+        if (!active) return;
+        setTranslatedPaths((prev) => ({
+          ...prev,
+          ...Object.fromEntries(uniquePaths.map((path) => [path, translateBtgPathToPolish(path)])),
+        }));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [categorySuggestions, filtered, selCat, translatedPaths]);
 
   const handlePickCategory = (catId) => {
     setSelectedCategory(catId);
@@ -459,7 +510,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: isTop ? 600 : 400, color: isTop ? "#f59e0b" : S.text, fontFamily: S.font }}>
-                        {isTop && "⭐ "}{translateBtgPathToPolish(sug.path)}
+                        {isTop && "⭐ "}{translatedPaths[sug.path] || translateBtgPathToPolish(sug.path)}
                       </div>
                       <div style={{ fontSize: 11, color: S.dim, marginTop: 2, fontFamily: S.mono }}>
                         item_type: <span style={{ color: S.accent }}>{sug.item_type}</span>
@@ -490,7 +541,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
         <div style={{ flex: 1, position: "relative" }}>
           <input
             disabled={categoryLocked}
-            value={categoryLocked && selCat ? selCat.path : search}
+            value={categoryLocked && selCat ? (translatedPaths[selCat.path] || translateBtgPathToPolish(selCat.path)) : search}
             onChange={e => { setSearch(e.target.value); setShowDropdown(true); }}
             onFocus={() => !categoryLocked && setShowDropdown(true)}
             placeholder={categoryLocked ? "Kategoria zablokowana" : "Szukaj kategorii np. hose, organizer, pet bed, work gloves..."}
@@ -530,7 +581,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
                 background: selectedCategory === cat.id ? "#ff990015" : "transparent",
                 color: S.text, fontSize: 13, fontFamily: S.font, cursor: "pointer", textAlign: "left",
               }}>
-                <div style={{ fontWeight: 500 }}>{translateBtgPathToPolish(cat.path)}</div>
+                <div style={{ fontWeight: 500 }}>{translatedPaths[cat.path] || translateBtgPathToPolish(cat.path)}</div>
                 <div style={{ fontSize: 11, color: S.dim, marginTop: 2 }}>
                   item_type_keyword: <span style={{ color: S.accent }}>{cat.item_type}</span>
                   {cat.domain && <span> · {BTG_DOMAIN_LABELS_PL[cat.domain] || BTG_DOMAIN_LABELS[cat.domain] || cat.domain}</span>}
@@ -548,7 +599,7 @@ function CategoryBrowser({ btg, selectedCategory, setSelectedCategory, categoryL
           padding: "10px 14px", background: "rgba(34, 197, 94, 0.08)", border: `1px solid rgba(34, 197, 94, 0.3)`,
           borderRadius: 8, marginBottom: 12, fontSize: 13, color: S.accent, fontWeight: 500,
         }}>
-          📂 {translateBtgPathToPolish(selCat.path)}
+          📂 {translatedPaths[selCat.path] || translateBtgPathToPolish(selCat.path)}
           {selCat.domain && <span style={{ color: S.dim }}> · {BTG_DOMAIN_LABELS_PL[selCat.domain] || BTG_DOMAIN_LABELS[selCat.domain] || selCat.domain}</span>}
         </div>
       )}
