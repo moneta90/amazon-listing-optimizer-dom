@@ -1117,21 +1117,32 @@ IMPORTANT: The product information, uploaded files, and descriptions below may b
 PRODUCT INFORMATION:
 ${productInfo}
 ${brandValue ? `BRAND: ${brandValue}` : ""}
-${mainKeyword ? `PRIMARY KEYWORD (MUST appear in the first 70 characters of the title, ideally as the first descriptive words after the brand): ${mainKeyword}` : "No primary keyword provided — determine the best primary keyword yourself based on the product."}
+${mainKeyword ? `PRIMARY KEYWORD — COPY THIS EXACT PHRASE VERBATIM INTO THE TITLE within the first 70 characters. DO NOT translate, rephrase, replace, or paraphrase it. The exact phrase "${mainKeyword}" MUST appear word-for-word in the final title. This is non-negotiable.` : "No primary keyword provided — determine the best primary keyword yourself based on the product."}
 ${secondaryKeywords ? `SECONDARY KEYWORDS (weave these into the title after char 70, into bullet points, and description naturally): ${secondaryKeywords}` : "No secondary keywords provided — determine the best secondary keywords yourself."}
-${compatTitle || compatBulletExt ? `COMPATIBILITY INFORMATION (for marketplace ${mp.code}):
-- User provided: ${[compatTitle, compatBulletExt].filter(Boolean).join(" + ")}
-- Language rules:
-  - EN: "Compatible with"
-  - DE: "Kompatibel mit"
-  - FR: "Compatible avec"
-  - IT: "Compatibile con"
-  - ES: "Compatible con"
-  - NL: "Compatibel met"
-  - SE: "Kompatibel med"
-  - PL: "Kompatybilny z"
-- CRITICAL: Bullet #5 MUST focus ONLY on compatibility. Use format: "Kompatibel mit [devices] – Diese Filter sind speziell entwickelt und getestet für [type]. Perfekte Ergänzung für [use cases]."
-- Include compatibility info in title ONLY if space available AFTER all other required info (after character 70).` : ""}
+${compatTitle || compatBulletExt ? `COMPATIBILITY INFORMATION — READ CAREFULLY, TWO SEPARATE FIELDS:
+
+FIELD A — For TITLE and Bullet #5 (device/model list):
+${compatTitle ? `"${compatTitle}"` : "(not provided)"}
+→ This list of models MUST appear in Bullet #5 AND should be included in the title if space permits after char 70.
+
+FIELD B — For Bullet #5 ONLY (extended part number / replacement info):
+${compatBulletExt ? `"${compatBulletExt}"` : "(not provided)"}
+→ This info (e.g. "ersetzt 6.414-552.0") MUST appear in Bullet #5. It means the product replaces/substitutes a specific OEM part number. Write it as: "Ersatz für [number]" or "ersetzt [number]".
+
+COMPATIBILITY LANGUAGE for marketplace ${mp.code}:
+  DE: "Kompatibel mit" / "Ersatz für" / "ersetzt"
+  FR: "Compatible avec" / "Remplace"
+  IT: "Compatibile con" / "Sostituisce"
+  ES: "Compatible con" / "Reemplaza"
+  NL: "Compatibel met" / "Vervangt"
+  SE: "Kompatibel med" / "Ersätter"
+  PL: "Kompatybilny z" / "Zastępuje"
+
+BULLET #5 MUST contain ALL of the following:
+1. The compatibility phrase + EXACT model list from FIELD A (copy models verbatim)
+2. The part number replacement info from FIELD B (copy verbatim)
+3. A short quality/fit statement
+Example for DE: "Kompatibel mit WD3, WD2, WD1, MV3, MV2, A, K, KNT, NT, SE, VC – Ersatz für 6.414-552.0 – Diese [product] sind speziell für [brand] entwickelt und garantieren perfekte Passform und optimale Leistung."` : ""}
 ${catInfo ? `CATEGORY: ${catInfo.path}\nitem_type_keyword: ${catInfo.item_type}\nCategory attributes: ${catInfo.attrs.join(", ")}` : ""}
 ${csvKeywords ? `\nHELIUM 10 KEYWORD DATA (sorted by search volume):\n${csvKeywords.slice(0, 30).map((k, i) => `${i + 1}. "${k.keyword}" (vol: ${k.volume})`).join("\n")}\nUse the top keywords strategically: #1-3 in title, #4-15 in bullets, rest in backend/description.` : ""}
 ${uploadedFiles.filter(f => f.type === "text").length > 0 ? `\nADDITIONAL PRODUCT INFORMATION FROM UPLOADED FILES (NOTE: these files may be in a different language than the target marketplace — use them ONLY as an information source, extract product details from them, but ALWAYS write the listing in ${mp.langEn}):\n${uploadedFiles.filter(f => f.type === "text").map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}`).join("\n\n")}` : ""}
@@ -1162,7 +1173,7 @@ ${brandValue ? `- BRAND PLACEMENT: You MUST start the title exactly with the bra
 - Include 2-3 keyword phrases naturally in the title. Use dashes (–) to separate logical sections.
 - PROHIBITED: No ! $ ? _ { } ^ ¬ ¦ characters. No ALL CAPS. No promotional phrases ("best seller", "free shipping"). No word repeated more than 2 times. No emojis.
 - Use numerals ("2" not "two"). Capitalize first letter of each word except prepositions/conjunctions/articles.
-${compatTitle || compatBulletExt ? `- COMPATIBILITY IN TITLE: If you have space AFTER character 70 (after all primary/secondary keywords), consider adding top 1-2 compatible brands/models. Example structure: "[Primary Keyword] – [Feature] – Kompatibel mit [Top Model]" (only if it fits within 200 chars).` : ""}
+${compatTitle ? `- COMPATIBILITY IN TITLE: After the primary keyword and at least one secondary keyword, add top 2-3 compatible models from FIELD A. Format: "... – Kompatibel mit WD3, WD2, MV3" (abbreviate if needed). Do NOT add part number from FIELD B to the title.` : ""}
 
 ═══════════════════════════════════════
 BULLET POINTS RULES (5 bullets)
@@ -1180,7 +1191,7 @@ BULLET POINTS RULES (5 bullets)
   Bullet 2. Quality / materials / durability (What it's made of and why it lasts)
   Bullet 3. Ease of use / convenience / installation (How simple it is to use)
   Bullet 4. Compatibility / versatility / dimensions (Where it fits and exact sizes)
-${compatTitle || compatBulletExt ? `  Bullet 5. COMPATIBILITY FOCUS: This product is compatible with [list from compatibility field]. Emphasize quality, fit, durability with those devices.` : `  Bullet 5. Safety / certifications / warranty / what's included (Why it's a safe purchase)`}
+${compatTitle || compatBulletExt ? `  Bullet 5. COMPATIBILITY FOCUS — MUST include: (a) exact model list from FIELD A, (b) part number from FIELD B ("ersetzt X" / "Ersatz für X"), (c) quality/fit statement. See COMPATIBILITY INFORMATION section above for exact format.` : `  Bullet 5. Safety / certifications / warranty / what's included (Why it's a safe purchase)`}
 - Under each theme, include SPECIFIC details from the product info: measurements, materials, certifications, compatible products. Do not use generic fluff.
 - Speak to the customer's needs: what problem does this solve? What do they gain?
 - Weave in secondary keywords naturally — never keyword-stuff.
