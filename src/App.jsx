@@ -1063,6 +1063,7 @@ function AIGeneratePanel({ listing, setListing, marketplace, provider, apiKey, g
         messages: messages,
         temperature: 0.7,
         max_tokens: 8192,
+        response_format: { type: "json_object" },
       };
     } else {
       url = "https://api.groq.com/openai/v1/chat/completions";
