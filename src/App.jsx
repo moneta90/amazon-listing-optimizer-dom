@@ -2084,10 +2084,10 @@ function ManualEditor({ listing, setListing }) {
 export default function App() {
   const [tab, setTab] = useState("generate");
   const [marketplace, setMarketplace] = useState("DE");
-  const [provider, setProvider] = useState("groq");
+  const [provider, setProvider] = useState("gemini");
   const [apiKey, setApiKey] = useState("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");
   const [geminiKey, setGeminiKey] = useState("AIzaSyAWwYa32pHDbxn3aAJc_UBXSP3tblwtpSM");
-  const [model, setModel] = useState("meta-llama/llama-4-scout-17b-16e-instruct");
+  const [model, setModel] = useState("gemini-3.1-flash-lite-preview");
   const [btg, setBtg] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [categoryLocked, setCategoryLocked] = useState(false); // Auto-lock category after detection
