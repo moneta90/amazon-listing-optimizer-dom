@@ -227,8 +227,8 @@ const BTG_SEMANTIC_MAP = [
   { from: ["schneidbrett","planche","tabla","tagliere","deska","snijplank","skärbräda"], to: ["cutting","board","schneidbrett"] },
   { from: ["kaffee","café","caffè","kawa","koffie","kaffe"], to: ["coffee","kaffee"] },
   { from: ["espresso","kaffeemaschine","machine","macchina","máquina","ekspres","koffiezetapparaat"], to: ["coffee","espresso","machine","kaffeemaschine"] },
-  { from: ["staubsauger","aspirapolvere","aspirateur","aspiradora","odkurzacz","stofzuiger","dammsugare"], to: ["vacuum","cleaner","staubsauger"] },
-  { from: ["beutel","sac","bolsa","sacchetto","worek","zak","påse","tüte","tüten"], to: ["bag","bags","beutel"] },
+  { from: ["staubsauger","aspirapolvere","aspirateur","aspiradora","odkurzacz","odkurzacza","odkurzaczy","stofzuiger","dammsugare","dyson"], to: ["vacuum","cleaner","staubsauger","sauger"] },
+  { from: ["beutel","sac","bolsa","sacchetto","worek","worki","workow","worków","zak","pase","påse","tüte","tüten"], to: ["bag","bags","beutel"] },
   { from: ["säge","scie","sierra","sega","piła","zaag","såg","astsäge","astschere"], to: ["saw","pruner","pruning","cutter","sage","säge"] },
   { from: ["garten","jardin","jardín","giardino","ogród","tuin","trädgård"], to: ["garden","gardening","outdoor","garten"] },
   { from: ["baum","arbre","árbol","albero","drzewo","boom","träd"], to: ["tree","branch","pruning","baum"] },
@@ -240,6 +240,7 @@ const BTG_SEMANTIC_MAP = [
   { from: ["laisse","leine","smycz","leash","guinzaglio","correa"], to: ["leash","leine"] },
   { from: ["lit","bett","bed","lozko","łóżko","cama","letto"], to: ["bed","bett"] },
   { from: ["bureau","schreibtisch","desk","biurko","scrivania","escritorio"], to: ["desk","schreibtisch"] },
+  { from: ["pyl","pylki","pyłów","pylow","dust","dustbag","kurz"], to: ["dust","staub","bag"] },
 ];
 
 function normalizeSearchText(text) {
@@ -1608,6 +1609,11 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         .map(([domain]) => domain)
     );
     const matchWords = [...expandedWords];
+    const queryBlob = matchWords.join(" ");
+    const hasVacuumIntent = ["vacuum", "staubsauger", "sauger", "odkurzacz", "dyson"].some(token => queryBlob.includes(token));
+    const hasBagIntent = ["bag", "bags", "beutel", "worek", "worki", "workow", "worków"].some(token => queryBlob.includes(token));
+    const hasWaterIntent = ["water", "wasser", "trinkwasser", "coffee", "espresso", "lodowka", "lodówki", "fridge", "waterfilter", "wasserfilter"].some(token => queryBlob.includes(normalizeSearchText(token)));
+    const hasVacuumBagIntent = hasVacuumIntent && hasBagIntent;
 
     // Score each category
     const scored = btgData.categories
@@ -1638,6 +1644,19 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
 
         if (likelyDomains.has(cat.domain)) score += Math.max(18, bestDomainScore * 0.35);
         else if (bestDomainScore > 0) score -= 8;
+
+        if (hasVacuumBagIntent) {
+          if (itemTypeLower.includes("staubsaugerbeutel")) score += 140;
+          if (pathLower.includes("staubsaugerbeutel")) score += 110;
+          if (pathLower.includes("staubsauger") && pathLower.includes("beutel")) score += 90;
+          if (itemTypeLower.includes("beutel") && pathLower.includes("staubsauger")) score += 70;
+          if (itemTypeLower.includes("wasserfilter") || pathLower.includes("wasserfilter")) score -= 80;
+          if (pathLower.includes("filter") && !pathLower.includes("staubsauger")) score -= 35;
+        }
+
+        if (!hasWaterIntent && (itemTypeLower.includes("wasserfilter") || pathLower.includes("wasserfilter"))) {
+          score -= 28;
+        }
 
         // Penalize irrelevant category words
         const penaltyWords = ["storage","container","paper","holder","rack","stand","organizer","hanger","shelf"];
