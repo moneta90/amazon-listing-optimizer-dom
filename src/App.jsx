@@ -1286,6 +1286,38 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         .filter(w => w.length >= 3 && !stopWords.has(w));
       const uniqueWords = [...new Set(words)].slice(0, 30);
 
+      // Semantic translation: map multilingual listing words → English BTG category words
+      // This solves the problem where listing is in DE/FR/IT/ES but BTG categories are in English
+      const semanticMap = [
+        { from: ["reiniger","reinigung","reinigt","reinigen","pulizia","pulitore","limpiador","limpieza","nettoyant","nettoyage","środek","czyszczący","czyszczenia","schoonmaakmiddel","rengöringsmedel","środki"], to: ["cleaner","cleaners","cleaning"] },
+        { from: ["tabletten","tablette","tablet","pastiglie","pastilla","pastilles","tabs","tab","blocco","bloc","block","kostki","kostka"], to: ["tablet","tabs","block","stone"] },
+        { from: ["wc","klo","klosett","kloset","toilette","toaleta","toalet","sanitär","sanitaire","bagno","baño","salle","bain"], to: ["toilet","bathroom"] },
+        { from: ["entkalker","entkalkung","entkalkungs","anticalcare","anticalcaire","descalcificador","odkamieniacz","kalkverwijderaar","avkalkningsmedel"], to: ["descaler","descaling","limescale"] },
+        { from: ["wasserfilter","filtre","filtro","filtr","waterfilter","vattenfilter","filter"], to: ["filter","water"] },
+        { from: ["duft","parfum","profumo","fragancia","zapach","geur","doft","scent"], to: ["scent","fragrance"] },
+        { from: ["antibakteriell","antibacterien","antibacterial","antibatterico","antybakteryjny"], to: ["antibacterial","antimicrobial"] },
+        { from: ["haushalt","ménage","hogar","casa","domowy","huishoud","hushåll"], to: ["household","home"] },
+        { from: ["küche","cuisine","cocina","cucina","kuchnia","keuken","kök"], to: ["kitchen"] },
+        { from: ["bad","badezimmer","salle de bain","baño","bagno","łazienka","badkamer","badrum"], to: ["bathroom","bath"] },
+        { from: ["spülmaschine","lave-vaisselle","lavavajillas","lavastoviglie","zmywarka","vaatwasser","diskmaskin"], to: ["dishwasher"] },
+        { from: ["waschmaschine","lave-linge","lavadora","lavatrice","pralka","wasmachine","tvättmaskin"], to: ["washing","laundry"] },
+        { from: ["flasche","bouteille","botella","bottiglia","butelka","fles","flaska"], to: ["bottle"] },
+        { from: ["schneidbrett","planche","tabla","tagliere","deska","snijplank","skärbräda"], to: ["cutting","board"] },
+        { from: ["kaffee","café","café","caffè","kawa","koffie","kaffe"], to: ["coffee"] },
+        { from: ["espresso","kaffeemaschine","machine","macchina","máquina","ekspres","koffiezetapparaat"], to: ["coffee","espresso","machine"] },
+      ];
+
+      // Build expanded word set with semantic equivalents
+      const expandedWords = new Set(uniqueWords);
+      for (const { from, to } of semanticMap) {
+        for (const fw of from) {
+          if (uniqueWords.some(w => w.includes(fw) || fw.includes(w))) {
+            to.forEach(tw => expandedWords.add(tw));
+          }
+        }
+      }
+      const allMatchWords = [...expandedWords];
+
       // Score each category by keyword match (fuzzy + substring)
       // item_type_keyword match counts 3x more (most specific identifier)
       const scored = btgData.categories.map(cat => {
@@ -1295,11 +1327,11 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
         const pathWords = pathLower.split(/[-_\s>]+/).filter(x => x.length >= 2);
 
         let score = 0;
-        for (const w of uniqueWords) {
+        for (const w of allMatchWords) {
           // Exact substring match (most precise)
           if (itemTypeLower.includes(w)) score += w.length * 3;
           else if (pathLower.includes(w)) score += w.length;
-          // Word-level match (for compound words like "water-bottle" or "water bottle")
+          // Word-level match (for compound words like "water-bottle")
           else {
             for (const iw of itemTypeWords) {
               if (iw.startsWith(w) || w.startsWith(iw)) score += Math.min(w.length, iw.length) * 2;
@@ -1309,6 +1341,16 @@ Double-check: Is every word in your JSON response written in ${mp.langEn}? If no
             }
           }
         }
+
+        // Penalize categories with words that don't appear anywhere in the listing
+        // e.g. "storage","container","paper" should lose score if listing has no such words
+        const penaltyWords = ["storage","container","paper","holder","rack","stand","organizer","hanger","shelf"];
+        for (const pw of penaltyWords) {
+          if (itemTypeLower.includes(pw) && !allMatchWords.some(w => w.includes(pw))) {
+            score -= pw.length * 4; // Strong penalty
+          }
+        }
+
         return { ...cat, score };
       });
 
@@ -1351,9 +1393,20 @@ ${categoryList}
 IMPORTANT RULES:
 - Choose the MOST SPECIFIC and PRECISE category for this exact product type.
 - If this is an accessory, replacement part, filter, or consumable — choose the accessory/parts/filter category, NOT the main device category.
-- Example: "water filter for coffee machine" → pick "coffee-machine-water-filters", NOT "coffee-makers".
-- Example: "replacement blade for blender" → pick "blender-accessories", NOT "blenders".
-- The item_type_keyword is the most important identifier — match it as precisely as possible.
+- NEVER pick "storage", "container", "holder", "rack", "organizer" categories for cleaning products, chemicals, or detergents.
+- NEVER pick appliance/device categories for cleaning tablets, descalers, or cleaning solutions.
+
+EXAMPLES (cleaning products):
+- "WC Reiniger tablets / pastiglie WC / toilet cleaner tabs" → "household-toilet-cleaners" NOT "toilet-paper-storage-containers"
+- "Entkalker / anticalcare / descaler for coffee machine" → "coffee-machine-descalers" NOT "coffee-makers"
+- "Spülmaschinentabs / dishwasher tablets" → "dishwasher-detergent" NOT "dishwashers"
+- "Waschmittel / laundry detergent" → "laundry-detergent" NOT "washing-machines"
+
+EXAMPLES (accessories):
+- "water filter for coffee machine" → "coffee-machine-water-filters" NOT "coffee-makers"
+- "replacement blade for blender" → "blender-accessories" NOT "blenders"
+
+The item_type_keyword is the most important identifier — match it as precisely as possible.
 
 Which category from the list BEST matches this product? Respond ONLY with JSON: {"categoryId": "CATEGORY_ID_HERE"}`;
 
